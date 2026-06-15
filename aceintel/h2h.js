@@ -2,16 +2,17 @@
    AceIntel — H2H Comparison Logic
    ═══════════════════════════════════════════ */
 
-(function () {
-  "use strict";
+  // ─── API Config & State ─────────────────
+  const API_BASE = "http://localhost:5000/api";
+  let p1Key = null, p2Key = null;
+  let playersList = [];
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
 
-  let p1Key = null, p2Key = null;
-
   // ─── Init ───────────────────────────
-  document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("DOMContentLoaded", async () => {
+    await fetchPlayersList();
     populateDropdowns();
     initNav();
     initSelector();
@@ -31,19 +32,35 @@
     }
   });
 
+  async function fetchPlayersList() {
+    try {
+      const res = await fetch(`${API_BASE}/players`);
+      if (res.ok) {
+        playersList = await res.json();
+      }
+    } catch (err) {
+      console.warn("Failed to fetch players list from API, using static fallback.", err);
+    }
+  }
+
   function resolveKey(q) {
-    const keys = Object.keys(PROFILE_DB);
+    const keys = (playersList && playersList.length > 0)
+      ? playersList.map(p => p.name)
+      : Object.keys(PROFILE_DB);
     return keys.find(k => k.toLowerCase() === q.toLowerCase())
         || keys.find(k => k.toLowerCase().includes(q.toLowerCase()));
   }
 
   // ─── Dropdowns ──────────────────────
   function populateDropdowns() {
-    const players = H2H_PLAYERS;
+    const players = (playersList && playersList.length > 0)
+      ? playersList.map(p => p.name)
+      : H2H_PLAYERS;
     ["sel-p1", "sel-p2"].forEach(id => {
       const sel = $(`#${id}`);
+      sel.innerHTML = '<option value="">Choose player…</option>';
       players.forEach(name => {
-        const p = PROFILE_DB[name];
+        const p = PROFILE_DB[name] || { overview: { flag: "🎾", name: name } };
         const opt = document.createElement("option");
         opt.value = name;
         opt.textContent = `${p.overview.flag} ${p.overview.name}`;
@@ -110,19 +127,40 @@
   // ═══════════════════════════════════════
   // BUILD FULL REPORT
   // ═══════════════════════════════════════
-  function buildReport(a, b) {
+  async function buildReport(a, b) {
     p1Key = a; p2Key = b;
 
     const report = $("#h2h-report");
     report.classList.remove("hidden");
 
-    const pa = PROFILE_DB[a];
-    const pb = PROFILE_DB[b];
-    const matchupKey = getMatchupKey(a, b);
-    const matchup = H2H_MATCHUP[matchupKey];
-    const meetings = H2H_MEETINGS[matchupKey];
-    const styleKey = matchupKey;
-    const style = H2H_STYLE[styleKey];
+    let data = null;
+    try {
+      const res = await fetch(`${API_BASE}/h2h?p1=${encodeURIComponent(a)}&p2=${encodeURIComponent(b)}`);
+      if (res.ok) {
+        data = await res.json();
+      }
+    } catch (err) {
+      console.warn("Failed to fetch H2H data from API, using fallback data", err);
+    }
+
+    let pa, pb, meetings, style, matchup, matchupKey;
+    if (data) {
+      pa = data.player1;
+      pb = data.player2;
+      meetings = data.meetings;
+      style = data.style;
+      matchup = data.matchup;
+      matchupKey = data.matchupKey;
+    } else {
+      pa = PROFILE_DB[a];
+      pb = PROFILE_DB[b];
+      matchupKey = getMatchupKey(a, b);
+      matchup = H2H_MATCHUP[matchupKey];
+      meetings = H2H_MEETINGS[matchupKey];
+      style = H2H_STYLE[matchupKey];
+    }
+
+    if (!pa || !pb) return;
 
     // Determine which player is "a" in the data (alphabetical)
     const [dataA, dataB] = getDataOrder(a, b);
@@ -138,7 +176,8 @@
     renderAISummary(pa, pb, matchup);
 
     setTimeout(() => {
-      document.getElementById("overview").scrollIntoView({ behavior: "smooth" });
+      const target = document.getElementById("overview");
+      if (target) target.scrollIntoView({ behavior: "smooth" });
     }, 100);
 
     initScrollReveal();

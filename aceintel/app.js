@@ -5,8 +5,10 @@
 (function () {
   "use strict";
 
-  // ─── State ──────────────────────────────
+  // ─── State & API Config ─────────────────
+  const API_BASE = "http://localhost:5000/api";
   let currentPlayer = "Anna Blinkova";
+  let playersList = [];
 
   // ─── DOM Cache ──────────────────────────
   const $ = (sel) => document.querySelector(sel);
@@ -22,7 +24,21 @@
     loadPlayerData(currentPlayer);
     initScrollReveal();
     initSmoothScroll();
+    
+    // Fetch players in the background
+    fetchPlayersList().catch(() => {});
   });
+
+  async function fetchPlayersList() {
+    try {
+      const res = await fetch(`${API_BASE}/players`);
+      if (res.ok) {
+        playersList = await res.json();
+      }
+    } catch (err) {
+      console.warn("Failed to fetch players list from API, using static fallback.", err);
+    }
+  }
 
   // ═══════════════════════════════════════
   // NAVBAR
@@ -86,7 +102,9 @@
 
   function searchPlayer(query) {
     // Find closest match
-    const keys = Object.keys(PLAYERS_DB);
+    const keys = (playersList && playersList.length > 0)
+      ? playersList.map(p => p.name)
+      : Object.keys(PLAYERS_DB);
     const match = keys.find(
       (k) => k.toLowerCase() === query.toLowerCase()
     ) || keys.find(
@@ -117,9 +135,26 @@
   // ═══════════════════════════════════════
   // TRENDING PLAYERS
   // ═══════════════════════════════════════
-  function renderTrending() {
+  async function renderTrending() {
     const grid = $("#trending-grid");
-    grid.innerHTML = TRENDING_PLAYERS.map((p, i) => `
+    
+    // Render static fallback immediately
+    renderTrendingUI(TRENDING_PLAYERS);
+
+    try {
+      const res = await fetch(`${API_BASE}/players?trending=true`);
+      if (res.ok) {
+        const trending = await res.json();
+        renderTrendingUI(trending);
+      }
+    } catch (err) {
+      console.warn("Using fallback trending data due to fetch error:", err);
+    }
+  }
+
+  function renderTrendingUI(trending) {
+    const grid = $("#trending-grid");
+    grid.innerHTML = trending.map((p, i) => `
       <div class="player-card reveal" style="transition-delay:${i * 0.08}s" data-player="${p.name}">
         <div class="player-card-header">
           <div class="player-avatar">${getInitials(p.name)}</div>
@@ -170,8 +205,10 @@
     });
   }
 
-  function renderCompare(q1, q2) {
-    const keys = Object.keys(PLAYERS_DB);
+  async function renderCompare(q1, q2) {
+    const keys = (playersList && playersList.length > 0)
+      ? playersList.map(p => p.name)
+      : Object.keys(PLAYERS_DB);
     const m1 = keys.find(k => k.toLowerCase().includes(q1.toLowerCase()));
     const m2 = keys.find(k => k.toLowerCase().includes(q2.toLowerCase()));
 
@@ -180,8 +217,49 @@
       return;
     }
 
-    const p1 = PLAYERS_DB[m1];
-    const p2 = PLAYERS_DB[m2];
+    let p1, p2;
+    try {
+      const res1 = await fetch(`${API_BASE}/players/${encodeURIComponent(m1)}`);
+      const res2 = await fetch(`${API_BASE}/players/${encodeURIComponent(m2)}`);
+      if (res1.ok && res2.ok) {
+        const d1 = await res1.json();
+        const d2 = await res2.json();
+        p1 = {
+          name: d1.overview.name,
+          rank: d1.overview.currentRank,
+          country: d1.overview.nationality,
+          stats: {
+            serve: d1.strengthMeter.serve,
+            return: d1.strengthMeter.return,
+            elo: d1.overview.elo,
+            pressure: d1.strengthMeter.pressurePoints,
+            tiebreak: parseInt(d1.surfaces.hard.tiebreakRecord.split("-")[0]) * 5 || 70,
+            breakPt: d1.returnAnalytics.breakConversion.value
+          }
+        };
+        p2 = {
+          name: d2.overview.name,
+          rank: d2.overview.currentRank,
+          country: d2.overview.nationality,
+          stats: {
+            serve: d2.strengthMeter.serve,
+            return: d2.strengthMeter.return,
+            elo: d2.overview.elo,
+            pressure: d2.strengthMeter.pressurePoints,
+            tiebreak: parseInt(d2.surfaces.hard.tiebreakRecord.split("-")[0]) * 5 || 70,
+            breakPt: d2.returnAnalytics.breakConversion.value
+          }
+        };
+      } else {
+        p1 = PLAYERS_DB[m1];
+        p2 = PLAYERS_DB[m2];
+      }
+    } catch (err) {
+      console.warn("Using static comparison due to fetch error:", err);
+      p1 = PLAYERS_DB[m1];
+      p2 = PLAYERS_DB[m2];
+    }
+
     const result = $("#compare-result");
     result.classList.remove("hidden");
 
@@ -245,10 +323,66 @@
   // ═══════════════════════════════════════
   // LOAD PLAYER DATA
   // ═══════════════════════════════════════
-  function loadPlayerData(name) {
-    const p = PLAYERS_DB[name];
-    if (!p) return;
+  async function loadPlayerData(name) {
+    // Render static data first as immediate fallback
+    const staticPlayer = PLAYERS_DB[name];
+    if (staticPlayer) {
+      renderPlayerUI(staticPlayer);
+    }
 
+    try {
+      const res = await fetch(`${API_BASE}/players/${encodeURIComponent(name)}`);
+      if (res.ok) {
+        const d = await res.json();
+        const p = {
+          name: d.overview.name,
+          country: d.overview.nationality + " " + d.overview.flag,
+          rank: d.overview.currentRank,
+          surfaces: {
+            grass: { winPct: d.surfaces.grass.winPct, rating: d.surfaces.grass.serveRating, strength: d.surfaces.grass.strength },
+            clay:  { winPct: d.surfaces.clay.winPct, rating: d.surfaces.clay.serveRating, strength: d.surfaces.clay.strength },
+            hard:  { winPct: d.surfaces.hard.winPct, rating: d.surfaces.hard.serveRating, strength: d.surfaces.hard.strength },
+          },
+          stats: {
+            serve: d.strengthMeter.serve,
+            return: d.strengthMeter.return,
+            elo: d.overview.elo,
+            pressure: d.strengthMeter.pressurePoints,
+            tiebreak: parseInt(d.surfaces.hard.tiebreakRecord.split("-")[0]) * 5 || 70,
+            breakPt: d.returnAnalytics.breakConversion.value,
+          },
+          recentMatches: d.recentMatches.map(m => ({
+            opponent: m.opponent,
+            event: m.tournament,
+            score: m.score,
+            result: m.result
+          })),
+          h2h: d.h2h ? {
+            opponent: d.h2h.opponent,
+            opponentRank: d.h2h.opponentRank,
+            record: d.h2h.record,
+            stats: d.h2h.stats
+          } : null,
+          aiInsights: d.aiInsights ? {
+            summary: d.aiInsights.summary,
+            strengths: d.aiInsights.strengths,
+            weaknesses: d.aiInsights.weaknesses,
+            tags: d.aiInsights.tags
+          } : {
+            summary: d.aiSummary,
+            strengths: ["Strong baseline play", "Solid court coverage"],
+            weaknesses: ["Second serve can be attacked"],
+            tags: ["Baseline Operator"]
+          }
+        };
+        renderPlayerUI(p);
+      }
+    } catch (err) {
+      console.warn("Using static player overview data due to fetch error:", err);
+    }
+  }
+
+  function renderPlayerUI(p) {
     // Update name references
     const nameSpans = ["#surface-player-name", "#stats-player-name", "#form-player-name", "#ai-player-name"];
     nameSpans.forEach((sel) => {
@@ -259,7 +393,14 @@
     renderSurfaces(p);
     renderStats(p);
     renderForm(p);
-    renderH2H(p);
+    if (p.h2h) {
+      renderH2H(p);
+      const h2hSec = $("#h2h");
+      if (h2hSec) h2hSec.style.display = "";
+    } else {
+      const h2hSec = $("#h2h");
+      if (h2hSec) h2hSec.style.display = "none";
+    }
     renderAI(p);
   }
 

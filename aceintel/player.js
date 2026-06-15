@@ -2,19 +2,21 @@
    AceIntel — Player Profile Logic
    ═══════════════════════════════════════════ */
 
-(function () {
-  "use strict";
+  // ─── API Config & State ─────────────────
+  const API_BASE = "http://localhost:5000/api";
+  let currentPlayerKey = null;
+  let playersList = [];
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
 
-  let currentPlayerKey = null;
-
   // ─── Init ───────────────────────────
-  document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("DOMContentLoaded", async () => {
     // Get player from URL param
     const params = new URLSearchParams(window.location.search);
     const playerParam = params.get("player") || "Anna Blinkova";
+
+    await fetchPlayersList();
 
     // Resolve player key
     currentPlayerKey = resolvePlayerKey(playerParam);
@@ -29,8 +31,21 @@
     initScrollReveal();
   });
 
+  async function fetchPlayersList() {
+    try {
+      const res = await fetch(`${API_BASE}/players`);
+      if (res.ok) {
+        playersList = await res.json();
+      }
+    } catch (err) {
+      console.warn("Failed to fetch players list from API, using static fallback.", err);
+    }
+  }
+
   function resolvePlayerKey(query) {
-    const keys = Object.keys(PROFILE_DB);
+    const keys = (playersList && playersList.length > 0)
+      ? playersList.map(p => p.name)
+      : Object.keys(PROFILE_DB);
     return keys.find(k => k.toLowerCase() === query.toLowerCase())
         || keys.find(k => k.toLowerCase().includes(query.toLowerCase()));
   }
@@ -101,19 +116,33 @@
       const url = new URL(window.location);
       url.searchParams.set("player", key);
       window.history.pushState({}, "", url);
-      document.title = `${PROFILE_DB[key].overview.name} — AceIntel`;
       loadProfile(key);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
-      showToast(`Player not found. Try: ${Object.keys(PROFILE_DB).join(", ")}`);
+      const keys = (playersList && playersList.length > 0)
+        ? playersList.map(p => p.name)
+        : Object.keys(PROFILE_DB);
+      showToast(`Player not found. Try: ${keys.join(", ")}`);
     }
   }
 
   // ═══════════════════════════════════════
   // LOAD FULL PROFILE
   // ═══════════════════════════════════════
-  function loadProfile(key) {
-    const p = PROFILE_DB[key];
+  async function loadProfile(key) {
+    let p = null;
+    try {
+      const res = await fetch(`${API_BASE}/players/${encodeURIComponent(key)}`);
+      if (res.ok) {
+        p = await res.json();
+      } else {
+        p = PROFILE_DB[key];
+      }
+    } catch (err) {
+      console.warn("Failed to fetch player profile from API, using fallback.", err);
+      p = PROFILE_DB[key];
+    }
+
     if (!p) return;
 
     document.title = `${p.overview.name} — AceIntel`;
@@ -333,7 +362,16 @@
 
           // Generate details content if not loaded yet
           if (!contentDiv.innerHTML.trim()) {
-            contentDiv.innerHTML = buildMatchDetailsHtml(p, p.recentMatches[index], index);
+            contentDiv.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text-muted)">Loading stats...</div>`;
+            fetch(`${API_BASE}/matches/${encodeURIComponent(p.overview.name)}/stats/${index}`)
+              .then(res => res.json())
+              .then(details => {
+                contentDiv.innerHTML = renderMatchDetailsHtmlFromAPI(details);
+              })
+              .catch(err => {
+                console.warn("Match stats fetch failed, using local seeded generator", err);
+                contentDiv.innerHTML = buildMatchDetailsHtml(p, p.recentMatches[index], index);
+              });
           }
 
           // Expand
@@ -348,6 +386,42 @@
     });
 
     refreshReveal();
+  }
+
+  function renderMatchDetailsHtmlFromAPI(details) {
+    const p = details.stats.player;
+    const o = details.stats.opponent;
+    return `
+      <div class="match-details-grid">
+        <!-- Stats -->
+        <div>
+          <h4 style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:6px">Match Statistics</h4>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            ${renderMatchStatRow("Aces", p.aces, o.aces, true)}
+            ${renderMatchStatRow("Double Faults", p.doubleFaults, o.doubleFaults, false)}
+            ${renderMatchStatRow("1st Serve %", p.firstServeInPct, o.firstServeInPct, true, "%")}
+            ${renderMatchStatRow("1st Serve Won %", p.firstServeWonPct, o.firstServeWonPct, true, "%")}
+            ${renderMatchStatRow("2nd Serve Won %", p.secondServeWonPct, o.secondServeWonPct, true, "%")}
+            ${renderMatchStatRow("Break Points", `${p.breakPointsConverted}/${p.breakPointsFaced}`, `${o.breakPointsConverted}/${o.breakPointsFaced}`, true, "", p.breakPointsFaced ? (p.breakPointsConverted/p.breakPointsFaced)*100 : 0, o.breakPointsFaced ? (o.breakPointsConverted/o.breakPointsFaced)*100 : 0)}
+            ${renderMatchStatRow("Winners", p.winners, o.winners, true)}
+            ${renderMatchStatRow("Unforced Errors", p.unforcedErrors, o.unforcedErrors, false)}
+          </div>
+        </div>
+        
+        <!-- AI Card -->
+        <div class="match-ai-card">
+          <div class="match-ai-header">
+            <span class="match-ai-icon">🤖</span>
+            <span class="match-ai-title">AI Tactical Summary</span>
+          </div>
+          <p class="match-ai-text">${details.aiRecap}</p>
+          <div style="margin-top:20px;display:flex;justify-content:space-between;align-items:center;font-size:0.75rem;color:var(--text-muted)">
+             <span>Tournament: <strong>${details.tournament}</strong></span>
+             <span>Surface: <strong style="color:var(--accent-hover)">${details.surface}</strong></span>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   // Seeded random helper for deterministic mock data
@@ -667,9 +741,23 @@
     });
   }
 
-  function renderPrediction(oppKey) {
-    const p = PROFILE_DB[currentPlayerKey];
-    const pred = p.predictions[oppKey];
+  async function renderPrediction(oppKey) {
+    let pred = null;
+    const p = PROFILE_DB[currentPlayerKey] || { overview: { name: currentPlayerKey } };
+    const playerName = p.overview.name;
+    
+    try {
+      const res = await fetch(`${API_BASE}/predictions/${encodeURIComponent(playerName)}/${encodeURIComponent(oppKey)}`);
+      if (res.ok) {
+        pred = await res.json();
+      } else {
+        pred = p.predictions ? p.predictions[oppKey] : null;
+      }
+    } catch (err) {
+      console.warn("Prediction fetch failed, using local prediction fallback", err);
+      pred = p.predictions ? p.predictions[oppKey] : null;
+    }
+
     if (!pred) return;
 
     const result = $("#predict-result");
@@ -689,8 +777,8 @@
     result.innerHTML = `
       <div class="predict-matchup">
         <div class="predict-player">
-          <div class="player-avatar">${getInitials(p.overview.name)}</div>
-          <div class="predict-player-name">${p.overview.name}</div>
+          <div class="player-avatar">${getInitials(playerName)}</div>
+          <div class="predict-player-name">${playerName}</div>
         </div>
         <div class="predict-vs">VS</div>
         <div class="predict-player">
@@ -725,7 +813,7 @@
       <div class="predict-reasoning">${pred.reasoning}</div>
 
       <div class="predict-h2h-link" style="text-align:center;margin-top:28px;">
-        <a href="h2h.html?p1=${encodeURIComponent(p.overview.name)}&p2=${encodeURIComponent(oppKey)}" class="btn btn-secondary btn-sm" style="background:rgba(255,255,255,0.05);border:1px solid var(--border)">
+        <a href="h2h.html?p1=${encodeURIComponent(playerName)}&p2=${encodeURIComponent(oppKey)}" class="btn btn-secondary btn-sm" style="background:rgba(255,255,255,0.05);border:1px solid var(--border)">
           <span>Compare Full Head-to-Head</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:4px;"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
         </a>
