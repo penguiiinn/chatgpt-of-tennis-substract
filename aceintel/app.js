@@ -231,6 +231,12 @@
           `;
         }).join("")}
       </div>
+      <div class="compare-h2h-link" style="text-align:center;margin-top:32px;">
+        <a href="h2h.html?p1=${encodeURIComponent(p1.name)}&p2=${encodeURIComponent(p2.name)}" class="btn btn-primary">
+          <span>Open Full H2H Comparison Report</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+      </div>
     `;
 
     result.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -419,6 +425,12 @@
             </div>
           `;
         }).join("")}
+      </div>
+      <div class="h2h-deep-link" style="text-align:center;margin-top:32px;">
+        <a href="h2h.html?p1=${encodeURIComponent(p.name)}&p2=${encodeURIComponent(h.opponent)}" class="btn btn-primary">
+          <span>Open Full H2H Comparison Report</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
       </div>
     `;
   }

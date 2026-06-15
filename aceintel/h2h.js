@@ -220,6 +220,11 @@
               <div class="ov-form-dots">${formDotsA}</div>
             </div>
           </div>
+          <div style="text-align:center;margin-top:20px;width:100%">
+            <a href="player.html?player=${encodeURIComponent(oa.name)}" class="btn btn-sm btn-secondary" style="display:inline-flex;justify-content:center;width:120px">
+              View Profile
+            </a>
+          </div>
         </div>
 
         <!-- Center -->
@@ -241,6 +246,11 @@
               <div class="ov-form-dots">${formDotsB}</div>
               <span class="ov-label">Form</span>
             </div>
+          </div>
+          <div style="text-align:center;margin-top:20px;width:100%">
+            <a href="player.html?player=${encodeURIComponent(ob.name)}" class="btn btn-sm btn-secondary" style="display:inline-flex;justify-content:center;width:120px">
+              View Profile
+            </a>
           </div>
         </div>
       </div>
