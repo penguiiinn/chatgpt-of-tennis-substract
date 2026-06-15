@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Player Profile — AceIntel</title>
+  <meta name="description" content="Deep player intelligence profile with serve analytics, surface breakdown, strength meter, and AI predictions." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="player.css" />
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-logo">
+        <span class="logo-icon">◆</span>
+        <span class="logo-text">Ace<span class="logo-accent">Intel</span></span>
+      </a>
+      <div class="nav-links" id="nav-links">
+        <a href="index.html" class="nav-link">Home</a>
+        <a href="#overview" class="nav-link active">Overview</a>
+        <a href="#surfaces" class="nav-link">Surfaces</a>
+        <a href="#matches" class="nav-link">Matches</a>
+        <a href="#serve" class="nav-link">Serve</a>
+        <a href="#return" class="nav-link">Return</a>
+        <a href="#strength" class="nav-link">Strength</a>
+        <a href="#ai" class="nav-link">AI</a>
+        <a href="#predict" class="nav-link">Predict</a>
+      </div>
+      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- PLAYER HEADER -->
+  <section class="profile-hero" id="overview">
+    <div class="profile-hero-bg">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+    </div>
+    <div class="container">
+      <!-- Quick search bar in profile -->
+      <div class="profile-search-row">
+        <div class="profile-search-box">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="profile-search" class="profile-search-input" placeholder="Switch player..." />
+          <button class="btn btn-sm btn-primary" id="btn-profile-search">Go</button>
+        </div>
+      </div>
+
+      <div class="profile-header" id="profile-header">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- SURFACE INTELLIGENCE -->
+  <section class="section" id="surfaces">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">🏟️ Surface Intelligence</div>
+        <h2 class="section-title">Court-by-Court Breakdown</h2>
+        <p class="section-subtitle">Detailed performance metrics across every surface type</p>
+      </div>
+      <div class="surface-best-banner" id="best-surface-banner"></div>
+      <div class="surface-deep-grid" id="surface-deep-grid">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- RECENT MATCHES -->
+  <section class="section section-alt" id="matches">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">📅 Recent Matches</div>
+        <h2 class="section-title">Last 10 Matches</h2>
+        <p class="section-subtitle">Complete match results with surface and tournament details</p>
+      </div>
+      <div class="matches-table-wrap" id="matches-table-wrap">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- SERVE ANALYTICS -->
+  <section class="section" id="serve">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">🎯 Serve Analytics</div>
+        <h2 class="section-title">Serve Breakdown</h2>
+        <p class="section-subtitle">Every serve stat explained in plain language</p>
+      </div>
+      <div class="analytics-grid" id="serve-grid">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- RETURN ANALYTICS -->
+  <section class="section section-alt" id="return">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">🛡️ Return Analytics</div>
+        <h2 class="section-title">Return Game</h2>
+        <p class="section-subtitle">How well they handle the opponent's serve</p>
+      </div>
+      <div class="analytics-grid" id="return-grid">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- STRENGTH METER -->
+  <section class="section" id="strength">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">💪 Strength Meter</div>
+        <h2 class="section-title">Player DNA</h2>
+        <p class="section-subtitle">Visual breakdown of core abilities</p>
+      </div>
+      <div class="strength-card" id="strength-card">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- AI SUMMARY -->
+  <section class="section section-alt" id="ai">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">🤖 AI Summary</div>
+        <h2 class="section-title">Intelligence Report</h2>
+        <p class="section-subtitle">Easy-to-understand analysis of strengths and weaknesses</p>
+      </div>
+      <div class="ai-summary-card" id="ai-summary-card">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- PREDICTION ENGINE -->
+  <section class="section" id="predict">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">🔮 Prediction Engine</div>
+        <h2 class="section-title">Match Predictor</h2>
+        <p class="section-subtitle">Select an opponent to see projected win probability</p>
+      </div>
+      <div class="predict-box">
+        <div class="predict-input-group">
+          <label class="predict-label">Opponent</label>
+          <select id="predict-opponent" class="predict-select">
+            <option value="">Choose opponent...</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-lg" id="btn-predict">
+          <span>Predict</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+      <div class="predict-result hidden" id="predict-result">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="logo-icon">◆</span>
+        <span class="logo-text">Ace<span class="logo-accent">Intel</span></span>
+        <p class="footer-tagline">AI-Powered Tennis Analytics</p>
+      </div>
+      <div class="footer-copy">© 2026 AceIntel. All data is mock/demo.</div>
+    </div>
+  </footer>
+
+  <script src="player-data.js"></script>
+  <script src="player.js"></script>
+</body>
+</html>

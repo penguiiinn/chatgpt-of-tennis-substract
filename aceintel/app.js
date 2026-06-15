@@ -94,10 +94,8 @@
     );
 
     if (match) {
-      currentPlayer = match;
-      loadPlayerData(match);
-      // Scroll to surfaces
-      document.getElementById("surfaces").scrollIntoView({ behavior: "smooth" });
+      // Navigate to deep player profile page
+      window.location.href = `player.html?player=${encodeURIComponent(match)}`;
     } else {
       showToast(`Player "${query}" not found. Try: ${keys.join(", ")}`);
     }
