@@ -1,0 +1,563 @@
+/* ═══════════════════════════════════════════
+   AceIntel — Application Logic
+   ═══════════════════════════════════════════ */
+
+(function () {
+  "use strict";
+
+  // ─── State ──────────────────────────────
+  let currentPlayer = "Anna Blinkova";
+
+  // ─── DOM Cache ──────────────────────────
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => document.querySelectorAll(sel);
+
+  // ─── Init ───────────────────────────────
+  document.addEventListener("DOMContentLoaded", () => {
+    initNav();
+    initSearch();
+    initChips();
+    renderTrending();
+    initCompare();
+    loadPlayerData(currentPlayer);
+    initScrollReveal();
+    initSmoothScroll();
+  });
+
+  // ═══════════════════════════════════════
+  // NAVBAR
+  // ═══════════════════════════════════════
+  function initNav() {
+    const toggle = $("#nav-toggle");
+    const links = $("#nav-links");
+
+    toggle.addEventListener("click", () => {
+      toggle.classList.toggle("active");
+      links.classList.toggle("open");
+    });
+
+    // Close on link click
+    $$(".nav-link").forEach((link) => {
+      link.addEventListener("click", () => {
+        toggle.classList.remove("active");
+        links.classList.remove("open");
+      });
+    });
+
+    // Active link on scroll
+    const sections = $$("section[id]");
+    const navLinks = $$(".nav-link");
+
+    window.addEventListener("scroll", () => {
+      let current = "";
+      sections.forEach((s) => {
+        if (window.scrollY >= s.offsetTop - 200) {
+          current = s.id;
+        }
+      });
+      navLinks.forEach((l) => {
+        l.classList.remove("active");
+        if (l.getAttribute("href") === "#" + current) {
+          l.classList.add("active");
+        }
+      });
+    });
+  }
+
+  // ═══════════════════════════════════════
+  // SEARCH
+  // ═══════════════════════════════════════
+  function initSearch() {
+    const input = $("#hero-search");
+    const btn = $("#btn-analyze");
+
+    btn.addEventListener("click", () => {
+      const query = input.value.trim();
+      if (query) searchPlayer(query);
+    });
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        const query = input.value.trim();
+        if (query) searchPlayer(query);
+      }
+    });
+  }
+
+  function searchPlayer(query) {
+    // Find closest match
+    const keys = Object.keys(PLAYERS_DB);
+    const match = keys.find(
+      (k) => k.toLowerCase() === query.toLowerCase()
+    ) || keys.find(
+      (k) => k.toLowerCase().includes(query.toLowerCase())
+    );
+
+    if (match) {
+      currentPlayer = match;
+      loadPlayerData(match);
+      // Scroll to surfaces
+      document.getElementById("surfaces").scrollIntoView({ behavior: "smooth" });
+    } else {
+      showToast(`Player "${query}" not found. Try: ${keys.join(", ")}`);
+    }
+  }
+
+  // ═══════════════════════════════════════
+  // CHIPS
+  // ═══════════════════════════════════════
+  function initChips() {
+    $$(".chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        const player = chip.dataset.player;
+        $("#hero-search").value = player;
+        searchPlayer(player);
+      });
+    });
+  }
+
+  // ═══════════════════════════════════════
+  // TRENDING PLAYERS
+  // ═══════════════════════════════════════
+  function renderTrending() {
+    const grid = $("#trending-grid");
+    grid.innerHTML = TRENDING_PLAYERS.map((p, i) => `
+      <div class="player-card reveal" style="transition-delay:${i * 0.08}s" data-player="${p.name}">
+        <div class="player-card-header">
+          <div class="player-avatar">${getInitials(p.name)}</div>
+          <div>
+            <div class="player-name">${p.name}</div>
+            <div class="player-country">${p.country}</div>
+          </div>
+        </div>
+        <div class="player-meta">
+          <div class="player-stat-row">
+            <span class="player-stat-label">Rank</span>
+            <span class="player-stat-value">#${p.rank}</span>
+          </div>
+          <div class="player-stat-row">
+            <span class="player-stat-label">Best Surface</span>
+            <span class="player-stat-value">${p.surface}</span>
+          </div>
+          <div class="player-stat-row">
+            <span class="player-stat-label">Current Form</span>
+            <span class="badge badge-${p.formColor}">${p.form}</span>
+          </div>
+        </div>
+      </div>
+    `).join("");
+
+    // Click on player card
+    $$(".player-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        const name = card.dataset.player;
+        $("#hero-search").value = name;
+        searchPlayer(name);
+      });
+    });
+  }
+
+  // ═══════════════════════════════════════
+  // COMPARE
+  // ═══════════════════════════════════════
+  function initCompare() {
+    $("#btn-compare").addEventListener("click", () => {
+      const p1 = $("#compare-p1").value.trim();
+      const p2 = $("#compare-p2").value.trim();
+      if (!p1 || !p2) {
+        showToast("Please enter both player names.");
+        return;
+      }
+      renderCompare(p1, p2);
+    });
+  }
+
+  function renderCompare(q1, q2) {
+    const keys = Object.keys(PLAYERS_DB);
+    const m1 = keys.find(k => k.toLowerCase().includes(q1.toLowerCase()));
+    const m2 = keys.find(k => k.toLowerCase().includes(q2.toLowerCase()));
+
+    if (!m1 || !m2) {
+      showToast(`Could not find one or both players. Available: ${keys.join(", ")}`);
+      return;
+    }
+
+    const p1 = PLAYERS_DB[m1];
+    const p2 = PLAYERS_DB[m2];
+    const result = $("#compare-result");
+    result.classList.remove("hidden");
+
+    const compareStats = [
+      { label: "Serve Rating",     v1: p1.stats.serve,    v2: p2.stats.serve },
+      { label: "Return Rating",    v1: p1.stats.return,   v2: p2.stats.return },
+      { label: "Elo Rating",       v1: p1.stats.elo,      v2: p2.stats.elo,     isElo: true },
+      { label: "Pressure",         v1: p1.stats.pressure, v2: p2.stats.pressure },
+      { label: "Tiebreak",         v1: p1.stats.tiebreak, v2: p2.stats.tiebreak },
+      { label: "Break Point Conv.", v1: p1.stats.breakPt,  v2: p2.stats.breakPt  },
+    ];
+
+    result.innerHTML = `
+      <div class="compare-header">
+        <div class="compare-player-info">
+          <div class="player-avatar">${getInitials(p1.name)}</div>
+          <div class="compare-player-name">${p1.name}</div>
+          <div class="compare-player-rank">#${p1.rank} • ${p1.country}</div>
+        </div>
+        <div class="compare-score-center">
+          <div class="compare-score-big">VS</div>
+          <div class="compare-score-label">Head to Head</div>
+        </div>
+        <div class="compare-player-info">
+          <div class="player-avatar" style="background:linear-gradient(135deg,#06b6d4,#0891b2)">${getInitials(p2.name)}</div>
+          <div class="compare-player-name">${p2.name}</div>
+          <div class="compare-player-rank">#${p2.rank} • ${p2.country}</div>
+        </div>
+      </div>
+      <div class="compare-bars">
+        ${compareStats.map((s) => {
+          const max = s.isElo ? Math.max(s.v1, s.v2) * 1.05 : 100;
+          const pct1 = (s.v1 / max) * 50;
+          const pct2 = (s.v2 / max) * 50;
+          return `
+            <div class="compare-bar-row">
+              <div class="compare-bar-label">${s.label}</div>
+              <div class="compare-bar-track">
+                <div class="compare-bar-fill-left" style="width:${pct1}%"></div>
+                <div class="compare-bar-fill-right" style="width:${pct2}%"></div>
+              </div>
+              <div class="compare-bar-values">
+                <span class="compare-bar-val p1">${s.v1}</span>
+                <span class="compare-bar-val p2">${s.v2}</span>
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+
+    result.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  // ═══════════════════════════════════════
+  // LOAD PLAYER DATA
+  // ═══════════════════════════════════════
+  function loadPlayerData(name) {
+    const p = PLAYERS_DB[name];
+    if (!p) return;
+
+    // Update name references
+    const nameSpans = ["#surface-player-name", "#stats-player-name", "#form-player-name", "#ai-player-name"];
+    nameSpans.forEach((sel) => {
+      const el = $(sel);
+      if (el) el.textContent = p.name;
+    });
+
+    renderSurfaces(p);
+    renderStats(p);
+    renderForm(p);
+    renderH2H(p);
+    renderAI(p);
+  }
+
+  // ═══════════════════════════════════════
+  // SURFACE INSIGHTS
+  // ═══════════════════════════════════════
+  function renderSurfaces(p) {
+    const grid = $("#surface-grid");
+    const surfaceData = [
+      { key: "grass", label: "Grass",     icon: "🌿", gradient: "grass" },
+      { key: "clay",  label: "Clay",      icon: "🧱", gradient: "clay" },
+      { key: "hard",  label: "Hard Court", icon: "🏟️", gradient: "hard" },
+    ];
+
+    grid.innerHTML = surfaceData.map((s, i) => {
+      const d = p.surfaces[s.key];
+      const strengthClass = d.strength.toLowerCase();
+      return `
+        <div class="surface-card ${s.key} reveal" style="transition-delay:${i * 0.1}s">
+          <div class="surface-card-header">
+            <div class="surface-name">
+              <div class="surface-icon">${s.icon}</div>
+              <div class="surface-label">${s.label}</div>
+            </div>
+            <span class="surface-strength strength-${strengthClass}">${d.strength}</span>
+          </div>
+          <div class="surface-stats">
+            <div class="surface-stat">
+              <span class="surface-stat-label">Win Rate</span>
+              <span class="surface-stat-value">${d.winPct}%</span>
+            </div>
+            <div class="surface-bar">
+              <div class="surface-bar-fill" style="width:${d.winPct}%"></div>
+            </div>
+            <div class="surface-stat">
+              <span class="surface-stat-label">Rating</span>
+              <span class="surface-stat-value">${d.rating}</span>
+            </div>
+            <div class="surface-bar">
+              <div class="surface-bar-fill" style="width:${d.rating}%"></div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    refreshReveal();
+  }
+
+  // ═══════════════════════════════════════
+  // STATS OVERVIEW
+  // ═══════════════════════════════════════
+  function renderStats(p) {
+    const grid = $("#stats-grid");
+    const statsData = [
+      { label: "Serve Rating",       value: p.stats.serve,    emoji: "🎯", sub: "Power & placement" },
+      { label: "Return Rating",      value: p.stats.return,   emoji: "🛡️", sub: "Defensive brilliance" },
+      { label: "Elo Rating",         value: p.stats.elo,      emoji: "📈", sub: "Overall strength", isElo: true },
+      { label: "Pressure Perf.",     value: p.stats.pressure, emoji: "🧠", sub: "Mental fortitude" },
+      { label: "Tiebreak Perf.",     value: p.stats.tiebreak, emoji: "⚡", sub: "Clutch moments" },
+      { label: "Break Pt Conv.",     value: p.stats.breakPt,  emoji: "💥", sub: "Converting chances" },
+    ];
+
+    grid.innerHTML = statsData.map((s, i) => {
+      const circumference = 2 * Math.PI * 30;
+      const pct = s.isElo ? Math.min(s.value / 2500, 1) : s.value / 100;
+      const offset = circumference * (1 - pct);
+
+      return `
+        <div class="stat-card reveal" style="transition-delay:${i * 0.08}s">
+          <div class="stat-ring">
+            <svg width="72" height="72" viewBox="0 0 72 72">
+              <defs>
+                <linearGradient id="ringGrad${i}" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#6366f1"/>
+                  <stop offset="100%" stop-color="#a78bfa"/>
+                </linearGradient>
+              </defs>
+              <circle class="stat-ring-bg" cx="36" cy="36" r="30"/>
+              <circle class="stat-ring-fill" cx="36" cy="36" r="30"
+                stroke="url(#ringGrad${i})"
+                stroke-dasharray="${circumference}"
+                stroke-dashoffset="${offset}"/>
+            </svg>
+            <div class="stat-ring-value">${s.isElo ? s.value : s.value}</div>
+          </div>
+          <div class="stat-label">${s.label}</div>
+          <div class="stat-sub">${s.sub}</div>
+        </div>
+      `;
+    }).join("");
+
+    refreshReveal();
+  }
+
+  // ═══════════════════════════════════════
+  // RECENT FORM
+  // ═══════════════════════════════════════
+  function renderForm(p) {
+    const timeline = $("#form-timeline");
+    timeline.innerHTML = p.recentMatches.map((m, i) => `
+      <div class="match-item" style="animation-delay:${i * 0.08}s">
+        <div class="match-dot ${m.result}"></div>
+        <div class="match-card">
+          <div class="match-info">
+            <div class="match-opponent">vs ${m.opponent}</div>
+            <div class="match-event">${m.event}</div>
+          </div>
+          <div class="match-score">${m.score}</div>
+          <span class="match-result ${m.result}">${m.result}</span>
+        </div>
+      </div>
+    `).join("");
+
+    // Re-trigger animations
+    setTimeout(() => {
+      $$(".match-item").forEach((el) => {
+        el.style.opacity = "1";
+      });
+    }, 100);
+  }
+
+  // ═══════════════════════════════════════
+  // HEAD TO HEAD
+  // ═══════════════════════════════════════
+  function renderH2H(p) {
+    const card = $("#h2h-card");
+    const h = p.h2h;
+
+    card.innerHTML = `
+      <div class="h2h-top">
+        <div class="h2h-player">
+          <div class="player-avatar">${getInitials(p.name)}</div>
+          <div class="h2h-player-name">${p.name}</div>
+          <div class="h2h-player-rank">#${p.rank}</div>
+        </div>
+        <div class="h2h-score">
+          <div class="h2h-score-big">${h.record}</div>
+          <div class="h2h-score-label">Overall Record</div>
+        </div>
+        <div class="h2h-player">
+          <div class="player-avatar" style="background:linear-gradient(135deg,#06b6d4,#0891b2)">${getInitials(h.opponent)}</div>
+          <div class="h2h-player-name">${h.opponent}</div>
+          <div class="h2h-player-rank">#${h.opponentRank}</div>
+        </div>
+      </div>
+      <div class="h2h-bars">
+        ${Object.entries(h.stats).map(([label, vals]) => {
+          const total = vals.p1 + vals.p2;
+          const pct1 = (vals.p1 / total) * 100;
+          const pct2 = (vals.p2 / total) * 100;
+          return `
+            <div class="h2h-bar-row">
+              <div class="h2h-bar-val">${vals.p1}</div>
+              <div class="h2h-bar-center">
+                <div class="h2h-bar-label">${label}</div>
+                <div class="h2h-bar-track">
+                  <div class="h2h-bar-fill-l" style="width:${pct1}%"></div>
+                  <div class="h2h-bar-fill-r" style="width:${pct2}%"></div>
+                </div>
+              </div>
+              <div class="h2h-bar-val">${vals.p2}</div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+  }
+
+  // ═══════════════════════════════════════
+  // AI INSIGHTS
+  // ═══════════════════════════════════════
+  function renderAI(p) {
+    const card = $("#ai-card");
+    const ai = p.aiInsights;
+
+    card.innerHTML = `
+      <div class="ai-header">
+        <div class="ai-icon">🤖</div>
+        <div class="ai-header-text">
+          <h3>AI Analysis — ${p.name}</h3>
+          <p>Generated from performance data & match history</p>
+        </div>
+      </div>
+
+      <div class="ai-section">
+        <div class="ai-section-title">📋 Overview</div>
+        <p class="ai-text">${ai.summary}</p>
+      </div>
+
+      <div class="ai-section">
+        <div class="ai-section-title">💪 Key Strengths</div>
+        <ul class="ai-text" style="padding-left:18px;">
+          ${ai.strengths.map((s) => `<li style="margin-bottom:6px;">${s}</li>`).join("")}
+        </ul>
+      </div>
+
+      <div class="ai-section">
+        <div class="ai-section-title">⚠️ Areas to Improve</div>
+        <ul class="ai-text" style="padding-left:18px;">
+          ${ai.weaknesses.map((w) => `<li style="margin-bottom:6px;">${w}</li>`).join("")}
+        </ul>
+      </div>
+
+      <div class="ai-tags">
+        ${ai.tags.map((t) => `<span class="ai-tag">${t}</span>`).join("")}
+      </div>
+    `;
+  }
+
+  // ═══════════════════════════════════════
+  // SCROLL REVEAL
+  // ═══════════════════════════════════════
+  function initScrollReveal() {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add("visible");
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: "0px 0px -40px 0px" }
+    );
+
+    $$(".reveal").forEach((el) => observer.observe(el));
+
+    // Store observer for re-use
+    window.__revealObserver = observer;
+  }
+
+  function refreshReveal() {
+    if (!window.__revealObserver) return;
+    $$(".reveal:not(.visible)").forEach((el) => {
+      window.__revealObserver.observe(el);
+    });
+  }
+
+  // ═══════════════════════════════════════
+  // SMOOTH SCROLL
+  // ═══════════════════════════════════════
+  function initSmoothScroll() {
+    $$('a[href^="#"]').forEach((a) => {
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        const target = document.querySelector(a.getAttribute("href"));
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth" });
+        }
+      });
+    });
+  }
+
+  // ═══════════════════════════════════════
+  // TOAST NOTIFICATIONS
+  // ═══════════════════════════════════════
+  function showToast(msg) {
+    const existing = $(".toast");
+    if (existing) existing.remove();
+
+    const toast = document.createElement("div");
+    toast.className = "toast";
+    toast.textContent = msg;
+    toast.style.cssText = `
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #1c2438;
+      color: #f0f2f5;
+      padding: 14px 28px;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      border: 1px solid rgba(99,102,241,0.3);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      z-index: 9999;
+      opacity: 0;
+      transition: all 0.4s cubic-bezier(0.4,0,0.2,1);
+    `;
+    document.body.appendChild(toast);
+
+    requestAnimationFrame(() => {
+      toast.style.opacity = "1";
+      toast.style.transform = "translateX(-50%) translateY(0)";
+    });
+
+    setTimeout(() => {
+      toast.style.opacity = "0";
+      toast.style.transform = "translateX(-50%) translateY(20px)";
+      setTimeout(() => toast.remove(), 400);
+    }, 3500);
+  }
+
+  // ═══════════════════════════════════════
+  // HELPERS
+  // ═══════════════════════════════════════
+  function getInitials(name) {
+    return name
+      .split(" ")
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  }
+})();

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AceIntel — Tennis Analytics Dashboard</title>
+  <meta name="description" content="Search any tennis player and instantly see all important tennis stats. Premium sports analytics powered by AI." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- NAV -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a href="#" class="nav-logo">
+        <span class="logo-icon">◆</span>
+        <span class="logo-text">Ace<span class="logo-accent">Intel</span></span>
+      </a>
+      <div class="nav-links" id="nav-links">
+        <a href="#hero" class="nav-link active">Search</a>
+        <a href="#trending" class="nav-link">Trending</a>
+        <a href="#compare" class="nav-link">Compare</a>
+        <a href="#surfaces" class="nav-link">Surfaces</a>
+        <a href="#stats" class="nav-link">Stats</a>
+        <a href="#form" class="nav-link">Form</a>
+        <a href="#h2h" class="nav-link">H2H</a>
+        <a href="#ai-insights" class="nav-link">AI</a>
+      </div>
+      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero" id="hero">
+    <div class="hero-bg-orbs">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+    </div>
+    <div class="container hero-content">
+      <div class="hero-badge">🎾 AI-Powered Tennis Analytics</div>
+      <h1 class="hero-title">
+        Unlock Player <br /><span class="gradient-text">Intelligence</span>
+      </h1>
+      <p class="hero-subtitle">
+        Search any tennis player and instantly access deep performance analytics,
+        surface insights, and AI-driven match predictions.
+      </p>
+      <div class="search-box" id="hero-search-box">
+        <div class="search-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+        <input
+          type="text"
+          class="search-input"
+          id="hero-search"
+          placeholder="Search player... e.g. Anna Blinkova"
+          autocomplete="off"
+        />
+        <button class="btn btn-primary" id="btn-analyze">
+          <span>Analyze Player</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+      <div class="hero-chips">
+        <span class="chip" data-player="Anna Blinkova">Anna Blinkova</span>
+        <span class="chip" data-player="Carlos Alcaraz">Carlos Alcaraz</span>
+        <span class="chip" data-player="Iga Swiatek">Iga Świątek</span>
+        <span class="chip" data-player="Jannik Sinner">Jannik Sinner</span>
+      </div>
+    </div>
+    <div class="hero-scroll-cue">
+      <span>Scroll to explore</span>
+      <div class="scroll-arrow"></div>
+    </div>
+  </section>
+
+  <!-- TRENDING PLAYERS -->
+  <section class="section" id="trending">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">🔥 Trending</div>
+        <h2 class="section-title">Hot Right Now</h2>
+        <p class="section-subtitle">Players generating buzz on the tour this week</p>
+      </div>
+      <div class="player-grid" id="trending-grid">
+        <!-- populated by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- COMPARE -->
+  <section class="section section-alt" id="compare">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">⚔️ Compare</div>
+        <h2 class="section-title">Head-to-Head Battle</h2>
+        <p class="section-subtitle">Put two players side by side and see who dominates</p>
+      </div>
+      <div class="compare-box">
+        <div class="compare-input-group">
+          <label class="compare-label">Player 1</label>
+          <input type="text" class="compare-input" id="compare-p1" placeholder="e.g. Carlos Alcaraz" />
+        </div>
+        <div class="compare-vs">VS</div>
+        <div class="compare-input-group">
+          <label class="compare-label">Player 2</label>
+          <input type="text" class="compare-input" id="compare-p2" placeholder="e.g. Jannik Sinner" />
+        </div>
+      </div>
+      <div class="compare-action">
+        <button class="btn btn-primary btn-lg" id="btn-compare">
+          <span>Compare Players</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+      <div class="compare-result hidden" id="compare-result">
+        <!-- populated by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- SURFACE INSIGHTS -->
+  <section class="section" id="surfaces">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">🏟️ Surfaces</div>
+        <h2 class="section-title">Surface Intelligence</h2>
+        <p class="section-subtitle">Performance breakdown across all court types for <span id="surface-player-name">Anna Blinkova</span></p>
+      </div>
+      <div class="surface-grid" id="surface-grid">
+        <!-- populated by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- STATS OVERVIEW -->
+  <section class="section section-alt" id="stats">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">📊 Stats</div>
+        <h2 class="section-title">Performance Matrix</h2>
+        <p class="section-subtitle">Key metrics that define <span id="stats-player-name">Anna Blinkova</span>'s game</p>
+      </div>
+      <div class="stats-grid" id="stats-grid">
+        <!-- populated by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- RECENT FORM -->
+  <section class="section" id="form">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">📅 Recent Form</div>
+        <h2 class="section-title">Last 10 Matches</h2>
+        <p class="section-subtitle">Recent match results for <span id="form-player-name">Anna Blinkova</span></p>
+      </div>
+      <div class="form-timeline" id="form-timeline">
+        <!-- populated by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- HEAD TO HEAD -->
+  <section class="section section-alt" id="h2h">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">🏆 Head-to-Head</div>
+        <h2 class="section-title">Rivalry Breakdown</h2>
+        <p class="section-subtitle">Visual comparison between top rivals</p>
+      </div>
+      <div class="h2h-card" id="h2h-card">
+        <!-- populated by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- AI INSIGHTS -->
+  <section class="section" id="ai-insights">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">🤖 AI Insights</div>
+        <h2 class="section-title">Intelligence Report</h2>
+        <p class="section-subtitle">AI-generated analysis for <span id="ai-player-name">Anna Blinkova</span></p>
+      </div>
+      <div class="ai-card" id="ai-card">
+        <!-- populated by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="logo-icon">◆</span>
+        <span class="logo-text">Ace<span class="logo-accent">Intel</span></span>
+        <p class="footer-tagline">AI-Powered Tennis Analytics</p>
+      </div>
+      <div class="footer-copy">© 2026 AceIntel. All data is mock/demo.</div>
+    </div>
+  </footer>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
