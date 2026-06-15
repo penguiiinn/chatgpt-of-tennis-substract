@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>H2H Comparison — AceIntel</title>
+  <meta name="description" content="Full head-to-head comparison between any two players. Surface breakdown, historical meetings, win probability, betting insights and AI summary." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="h2h.css" />
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-logo">
+        <span class="logo-icon">◆</span>
+        <span class="logo-text">Ace<span class="logo-accent">Intel</span></span>
+      </a>
+      <div class="nav-links" id="nav-links">
+        <a href="index.html" class="nav-link">Home</a>
+        <a href="#selector" class="nav-link active">Select</a>
+        <a href="#overview" class="nav-link">Overview</a>
+        <a href="#surfaces" class="nav-link">Surfaces</a>
+        <a href="#history" class="nav-link">History</a>
+        <a href="#clash" class="nav-link">Clash</a>
+        <a href="#matchup" class="nav-link">Matchup</a>
+        <a href="#predict" class="nav-link">Predict</a>
+        <a href="#betting" class="nav-link">Insights</a>
+      </div>
+      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- SELECTOR HERO -->
+  <section class="h2h-hero" id="selector">
+    <div class="hero-bg-orbs">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+    </div>
+    <div class="container h2h-hero-content">
+      <div class="section-badge" style="margin-bottom:20px">⚔️ Head-to-Head</div>
+      <h1 class="hero-title">Player <span class="gradient-text">Comparison</span></h1>
+      <p class="hero-subtitle">Select two players for a complete side-by-side intelligence report</p>
+
+      <div class="h2h-selector-card">
+        <div class="h2h-selector-row">
+          <div class="h2h-select-group">
+            <label class="h2h-select-label">Player 1</label>
+            <select id="sel-p1" class="h2h-select">
+              <option value="">Choose player…</option>
+            </select>
+          </div>
+          <div class="h2h-vs-badge">VS</div>
+          <div class="h2h-select-group">
+            <label class="h2h-select-label">Player 2</label>
+            <select id="sel-p2" class="h2h-select">
+              <option value="">Choose player…</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-lg" id="btn-compare" style="width:100%;justify-content:center;margin-top:24px">
+          <span>Generate Full Report</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- FULL REPORT (hidden until players selected) -->
+  <div id="h2h-report" class="hidden">
+
+    <!-- OVERVIEW -->
+    <section class="section section-alt" id="overview">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-badge">👤 Overview</div>
+          <h2 class="section-title">Player vs. Player</h2>
+          <p class="section-subtitle">Key stats compared side by side</p>
+        </div>
+        <div id="overview-content"></div>
+      </div>
+    </section>
+
+    <!-- SURFACE COMPARISON -->
+    <section class="section" id="surfaces">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-badge">🏟️ Surfaces</div>
+          <h2 class="section-title">Court-by-Court Breakdown</h2>
+          <p class="section-subtitle">Every surface compared with advantage highlighted</p>
+        </div>
+        <div id="surfaces-content"></div>
+      </div>
+    </section>
+
+    <!-- HISTORICAL H2H -->
+    <section class="section section-alt" id="history">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-badge">📜 History</div>
+          <h2 class="section-title">Historical Meetings</h2>
+          <p class="section-subtitle">Every time these players have faced each other</p>
+        </div>
+        <div id="history-content"></div>
+      </div>
+    </section>
+
+    <!-- STYLE CLASH -->
+    <section class="section" id="clash">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-badge">🥊 Style Clash</div>
+          <h2 class="section-title">Playing Style Analysis</h2>
+          <p class="section-subtitle">How their contrasting styles create the matchup dynamic</p>
+        </div>
+        <div id="clash-content"></div>
+      </div>
+    </section>
+
+    <!-- MATCHUP BARS -->
+    <section class="section section-alt" id="matchup">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-badge">💪 Matchup</div>
+          <h2 class="section-title">Strength Comparison</h2>
+          <p class="section-subtitle">Advantages and edge in each key dimension</p>
+        </div>
+        <div id="matchup-content"></div>
+      </div>
+    </section>
+
+    <!-- WIN PROBABILITY -->
+    <section class="section" id="predict">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-badge">🔮 Win Probability</div>
+          <h2 class="section-title">Who Wins?</h2>
+          <p class="section-subtitle">AI-generated probability with key reasons</p>
+        </div>
+        <div id="predict-content"></div>
+      </div>
+    </section>
+
+    <!-- BETTING INSIGHTS -->
+    <section class="section section-alt" id="betting">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-badge">📊 Betting Insights</div>
+          <h2 class="section-title">Match Insights</h2>
+          <p class="section-subtitle">Statistical tendencies and probability angles</p>
+        </div>
+        <div id="betting-content"></div>
+      </div>
+    </section>
+
+    <!-- AI MATCH SUMMARY -->
+    <section class="section" id="ai-summary">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-badge">🤖 AI Summary</div>
+          <h2 class="section-title">AI Match Report</h2>
+          <p class="section-subtitle">Plain-language analysis of the complete matchup</p>
+        </div>
+        <div id="ai-summary-content"></div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="logo-icon">◆</span>
+        <span class="logo-text">Ace<span class="logo-accent">Intel</span></span>
+        <p class="footer-tagline">AI-Powered Tennis Analytics</p>
+      </div>
+      <div class="footer-copy">© 2026 AceIntel. All data is mock/demo.</div>
+    </div>
+  </footer>
+
+  <script src="player-data.js"></script>
+  <script src="h2h-data.js"></script>
+  <script src="h2h.js"></script>
+</body>
+</html>
