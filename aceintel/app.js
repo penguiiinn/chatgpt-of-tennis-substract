@@ -102,13 +102,8 @@
   function attachAutocompleteToInput({ input, dropdown, contextName }) {
     let debounceTimer = null;
     let activeIdx = -1;
-
-    // Used to ignore out-of-order async responses.
-    if (typeof attachAutocompleteToInput.__reqIdCounter === "undefined") {
-      attachAutocompleteToInput.__reqIdCounter = 0;
-      attachAutocompleteToInput.__lastReqId = 0;
-    }
-
+    let activeReqId = 0;
+    let abortController = null;
 
     const showLoading = () => {
       dropdown.classList.add("open");
@@ -118,6 +113,13 @@
           Searching…
         </div>
       `;
+    };
+
+    const clearLoader = () => {
+      if (dropdown.innerHTML.includes("Searching…")) {
+        dropdown.innerHTML = "";
+        dropdown.classList.remove("open");
+      }
     };
 
     const clearDropdown = () => {
@@ -148,8 +150,46 @@
       window.location.href = `player.html?player=${encodeURIComponent(pickedSlug)}`;
     };
 
-    // Track abort controller per input instance to cancel old requests
-    let abortController = null;
+    const renderSuggestions = (data) => {
+      console.log("render start");
+      dropdown.innerHTML = "";
+      activeIdx = -1;
+
+      if (data && data.length > 0) {
+        const query = input.value.trim();
+        dropdown.innerHTML = data.map((m) => {
+          const slug = extractSlug(m.url);
+          return `
+            <div class="search-dropdown-item" data-name="${m.name}" data-slug="${slug}" data-tour="${m.tour}">
+              <div class="search-dropdown-avatar">${getInitials(m.name)}</div>
+              <div class="search-dropdown-info">
+                <div class="search-dropdown-name">${highlightMatch(m.name, query)}</div>
+                <div class="search-dropdown-tour">${(m.tour || "").toUpperCase()}</div>
+              </div>
+            </div>
+          `;
+        }).join("");
+
+        dropdown.classList.add("open");
+
+        dropdown.querySelectorAll(".search-dropdown-item").forEach((item, idx) => {
+          item.addEventListener("click", () => setSelection(item));
+          item.addEventListener("mouseenter", () => {
+            activeIdx = idx;
+            const items = dropdown.querySelectorAll(".search-dropdown-item");
+            items.forEach((it, i) => it.classList.toggle("highlighted", i === activeIdx));
+          });
+        });
+
+        // Keyboard navigation
+        const items = dropdown.querySelectorAll(".search-dropdown-item");
+        items.forEach((it, idx) => it.classList.toggle("highlighted", idx === activeIdx));
+      } else {
+        dropdown.innerHTML = `<div class="search-dropdown-empty">No results found</div>`;
+        dropdown.classList.add("open");
+      }
+      console.log("render complete");
+    };
 
     input.addEventListener("input", () => {
       // Prevent invalid manual submit after typing
@@ -161,17 +201,26 @@
 
       if (query.length < 2) {
         clearDropdown();
-        if (abortController) abortController.abort();
+        if (abortController) {
+          abortController.abort();
+          clearLoader();
+        }
         return;
       }
 
       // Cancel in-flight request immediately when user types again
-      if (abortController) abortController.abort();
+      if (abortController) {
+        abortController.abort();
+        clearLoader();
+      }
       abortController = new AbortController();
       const signal = abortController.signal;
 
-      const reqId = ++attachAutocompleteToInput.__reqIdCounter;
+      activeReqId++;
+      const reqId = activeReqId;
+
       debounceTimer = setTimeout(async () => {
+        console.log("fetch start");
         showLoading();
         try {
           const res = await fetch(
@@ -181,58 +230,25 @@
           if (!res.ok) throw new Error("Search API error");
           const data = await res.json();
 
-          // Expose returned data for debugging (requested)
-          console.log(data);
+          console.log("fetch success");
+          console.log("data length:", data.length);
 
           // Ignore stale responses from older keystrokes
-          if (reqId !== attachAutocompleteToInput.__lastReqId) return;
-          attachAutocompleteToInput.__lastReqId = reqId;
+          if (reqId !== activeReqId) return;
 
-          if (data.length > 0) {
-            activeIdx = -1;
-            dropdown.innerHTML = data.map((m) => {
-              const slug = extractSlug(m.url);
-              return `
-                <div class="search-dropdown-item" data-name="${m.name}" data-slug="${slug}" data-tour="${m.tour}">
-                  <div class="search-dropdown-avatar">${getInitials(m.name)}</div>
-                  <div class="search-dropdown-info">
-                    <div class="search-dropdown-name">${highlightMatch(m.name, query)}</div>
-                    <div class="search-dropdown-tour">${(m.tour || "").toUpperCase()}</div>
-                  </div>
-                </div>
-              `;
-            }).join("");
-
-            dropdown.classList.add("open");
-
-            dropdown.querySelectorAll(".search-dropdown-item").forEach((item, idx) => {
-              item.addEventListener("click", () => setSelection(item));
-              item.addEventListener("mouseenter", () => {
-                activeIdx = idx;
-                const items = dropdown.querySelectorAll(".search-dropdown-item");
-                items.forEach((it, i) => it.classList.toggle("highlighted", i === activeIdx));
-              });
-            });
-
-            // Keyboard navigation
-            const items = dropdown.querySelectorAll(".search-dropdown-item");
-            items.forEach((it, idx) => it.classList.toggle("highlighted", idx === activeIdx));
-          } else if (data.length === 0) {
-            dropdown.innerHTML = `<div class="search-dropdown-empty">No players found</div>`;
-            dropdown.classList.add("open");
-          }
+          renderSuggestions(data);
         } catch (err) {
           // Ignore abort errors (they happen during fast typing)
-          if (err && err.name === "AbortError") return;
+          if (err && err.name === "AbortError") {
+            clearLoader();
+            return;
+          }
 
           console.error(`Global search failed (${contextName}):`, err);
-          dropdown.innerHTML = "";
-          dropdown.classList.remove("open");
+          clearLoader();
         } finally {
-          // Ensure loader is removed even if fetch errors or is aborted
-          dropdown.classList.remove("open");
-          const wasLoading = dropdown.innerHTML.includes("Searching");
-          if (wasLoading) dropdown.innerHTML = "";
+          // Ensure loading state is always removed inside finally {}
+          clearLoader();
         }
       }, 300);
     });
