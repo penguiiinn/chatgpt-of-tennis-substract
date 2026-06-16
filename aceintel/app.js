@@ -6,7 +6,7 @@
   "use strict";
 
   // ─── State & API Config ─────────────────
-  const API_BASE = "https://aceintel-backend.onrender.com/api";
+  const API_BASE = "https://aceintel-backend.onrender.com";
   let currentPlayer = "Anna Blinkova";
   let playersList = [];
 
@@ -30,8 +30,14 @@
     // deprecated: homepage autocomplete is selection-only via the Tennis Abstract search API.
     // keep function to avoid breaking other page logic if referenced elsewhere.
     try {
-      const res = await fetch(`${API_BASE}/players`);
-      if (res.ok) playersList = await res.json();
+      const url = `${API_BASE}/api/players`;
+      console.log("Calling API URL:", url);
+      const res = await fetch(url);
+      console.log("Fetch status:", res.status);
+      if (res.ok) {
+        playersList = await res.json();
+        console.log("Response JSON:", playersList);
+      }
     } catch (err) {
       console.warn("Failed to fetch players list from API.", err);
     }
@@ -175,15 +181,35 @@
       const query = input.value.trim();
       const queryLower = query.toLowerCase();
       const queryParts = queryLower.split(/\s+/).filter(Boolean);
-      const filteredData = (data || []).filter(player => {
+      let filteredData = (data || []).filter(player => {
         if (!player.name) return false;
         const playerNameLower = player.name.toLowerCase();
         return queryParts.every(part => playerNameLower.includes(part));
       });
 
+      // Supplement with static PLAYERS_DB keys to guarantee matches (like Jannik Sinner, Carlos Alcaraz)
+      if (typeof PLAYERS_DB !== "undefined" && queryParts.length > 0) {
+        const staticKeys = Object.keys(PLAYERS_DB);
+        staticKeys.forEach(name => {
+          const playerNameLower = name.toLowerCase();
+          const matches = queryParts.every(part => playerNameLower.includes(part));
+          if (matches) {
+            const exists = filteredData.some(p => p.name.toLowerCase() === playerNameLower);
+            if (!exists) {
+              const tour = (name === "Carlos Alcaraz" || name === "Jannik Sinner") ? "ATP" : "WTA";
+              filteredData.push({
+                name: name,
+                url: `https://www.tennisabstract.com/cgi-bin/player.cgi?p=${name.replace(/\s+/g, "")}`,
+                tour: tour
+              });
+            }
+          }
+        });
+      }
+
       if (filteredData.length > 0) {
         dropdown.innerHTML = filteredData.map((m) => {
-          const slug = extractSlug(m.url);
+          const slug = extractSlug(m.url) || m.name.replace(/\s+/g, "-").toLowerCase();
           return `
             <div class="search-dropdown-item" data-name="${m.name}" data-slug="${slug}" data-tour="${m.tour}">
               <div class="search-dropdown-avatar">${getInitials(m.name)}</div>
@@ -254,12 +280,13 @@
         console.log("fetch start");
         showLoading();
         try {
-          const res = await fetch(
-            `${API_BASE}/search?name=${encodeURIComponent(query)}&limit=10`,
-            { signal }
-          );
+          const url = `${API_BASE}/api/search?q=${encodeURIComponent(query)}&name=${encodeURIComponent(query)}&limit=10`;
+          console.log("API URL being called:", url);
+          const res = await fetch(url, { signal });
+          console.log("fetch status:", res.status);
           if (!res.ok) throw new Error("Search API error");
           const data = await res.json();
+          console.log("response JSON:", data);
 
           console.log("fetch success");
           console.log("data length:", data.length);
@@ -460,9 +487,13 @@
     renderTrendingUI(TRENDING_PLAYERS);
 
     try {
-      const res = await fetch(`${API_BASE}/players?trending=true`);
+      const url = `${API_BASE}/api/players?trending=true`;
+      console.log("API URL being called:", url);
+      const res = await fetch(url);
+      console.log("fetch status:", res.status);
       if (res.ok) {
         const trending = await res.json();
+        console.log("response JSON:", trending);
         renderTrendingUI(trending);
       }
     } catch (err) {
@@ -541,17 +572,41 @@
       if (q.length < 2) { dd.classList.remove("open"); dd.innerHTML = ""; return; }
       timer = setTimeout(async () => {
         try {
-          const res = await fetch(`${API_BASE}/search?name=${encodeURIComponent(q)}&limit=8`);
+          const url = `${API_BASE}/api/search?q=${encodeURIComponent(q)}&name=${encodeURIComponent(q)}&limit=8`;
+          console.log("API URL being called:", url);
+          const res = await fetch(url);
+          console.log("fetch status:", res.status);
           if (!res.ok) throw new Error();
           const results = await res.json();
+          console.log("response JSON:", results);
           
           const queryLower = q.toLowerCase();
           const queryParts = queryLower.split(/\s+/).filter(Boolean);
-          const filteredResults = results.filter(player => {
+          let filteredResults = results.filter(player => {
             if (!player.name) return false;
             const playerNameLower = player.name.toLowerCase();
             return queryParts.every(part => playerNameLower.includes(part));
           });
+
+          // Supplement with static PLAYERS_DB keys to guarantee matches (like Jannik Sinner, Carlos Alcaraz)
+          if (typeof PLAYERS_DB !== "undefined" && queryParts.length > 0) {
+            const staticKeys = Object.keys(PLAYERS_DB);
+            staticKeys.forEach(name => {
+              const playerNameLower = name.toLowerCase();
+              const matches = queryParts.every(part => playerNameLower.includes(part));
+              if (matches) {
+                const exists = filteredResults.some(p => p.name.toLowerCase() === playerNameLower);
+                if (!exists) {
+                  const tour = (name === "Carlos Alcaraz" || name === "Jannik Sinner") ? "ATP" : "WTA";
+                  filteredResults.push({
+                    name: name,
+                    url: `https://www.tennisabstract.com/cgi-bin/player.cgi?p=${name.replace(/\s+/g, "")}`,
+                    tour: tour
+                  });
+                }
+              }
+            });
+          }
 
           if (!filteredResults.length) { dd.innerHTML = `<div class="search-dropdown-empty">No players found</div>`; dd.classList.add("open"); return; }
           dd.innerHTML = filteredResults.map(p => `
@@ -582,14 +637,27 @@
   async function renderCompare(q1, q2) {
     // Try resolving via search API first
     let m1 = null, m2 = null;
+
     try {
-      const [r1, r2] = await Promise.all([
-        fetch(`${API_BASE}/search?name=${encodeURIComponent(q1)}&limit=1`).then(r => r.json()),
-        fetch(`${API_BASE}/search?name=${encodeURIComponent(q2)}&limit=1`).then(r => r.json()),
-      ]);
-      if (r1.length) m1 = r1[0].name;
-      if (r2.length) m2 = r2[0].name;
-    } catch { /* fallback below */ }
+      const url1 = `${API_BASE}/api/search?q=${encodeURIComponent(q1)}&name=${encodeURIComponent(q1)}&limit=1`;
+      const url2 = `${API_BASE}/api/search?q=${encodeURIComponent(q2)}&name=${encodeURIComponent(q2)}&limit=1`;
+      console.log("API URL being called:", url1);
+      console.log("API URL being called:", url2);
+
+      const [res1, res2] = await Promise.all([fetch(url1), fetch(url2)]);
+      console.log("fetch status:", res1.status);
+      console.log("fetch status:", res2.status);
+
+      if (res1.ok && res2.ok) {
+        const [r1, r2] = await Promise.all([res1.json(), res2.json()]);
+        console.log("response JSON:", r1);
+        console.log("response JSON:", r2);
+        if (r1.length) m1 = r1[0].name;
+        if (r2.length) m2 = r2[0].name;
+      }
+    } catch (err) {
+      console.warn("Search resolution failed inside renderCompare", err);
+    }
 
     // Fallback to static keys
     if (!m1 || !m2) {
@@ -616,11 +684,21 @@
 
     let p1, p2;
     try {
-      const res1 = await fetch(`${API_BASE}/players/${encodeURIComponent(m1)}`);
-      const res2 = await fetch(`${API_BASE}/players/${encodeURIComponent(m2)}`);
+      const url1 = `${API_BASE}/api/players/${encodeURIComponent(m1)}`;
+      const url2 = `${API_BASE}/api/players/${encodeURIComponent(m2)}`;
+      console.log("API URL being called:", url1);
+      console.log("API URL being called:", url2);
+
+      const res1 = await fetch(url1);
+      const res2 = await fetch(url2);
+      console.log("fetch status:", res1.status);
+      console.log("fetch status:", res2.status);
+
       if (res1.ok && res2.ok) {
         const d1 = await res1.json();
         const d2 = await res2.json();
+        console.log("response JSON:", d1);
+        console.log("response JSON:", d2);
         p1 = {
           name: d1.overview.name,
           rank: d1.overview.currentRank,
@@ -728,9 +806,13 @@
     }
 
     try {
-      const res = await fetch(`${API_BASE}/players/${encodeURIComponent(name)}`);
+      const url = `${API_BASE}/api/players/${encodeURIComponent(name)}`;
+      console.log("API URL being called:", url);
+      const res = await fetch(url);
+      console.log("fetch status:", res.status);
       if (res.ok) {
         const d = await res.json();
+        console.log("response JSON:", d);
         const p = {
           name: d.overview.name,
           country: d.overview.nationality + " " + d.overview.flag,
