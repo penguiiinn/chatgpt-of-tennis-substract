@@ -8,8 +8,15 @@ const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 function resolvePlayerKey(query) {
   if (!query) return null;
   const keys = Object.keys(PROFILE_DB);
-  const matched = keys.find(k => k.toLowerCase() === query.toLowerCase())
+  
+  // Normalize both by removing whitespace and converting to lowercase
+  const normalize = str => str.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const normQuery = normalize(query);
+  
+  const matched = keys.find(k => normalize(k) === normQuery)
+      || keys.find(k => k.toLowerCase() === query.toLowerCase())
       || keys.find(k => k.toLowerCase().includes(query.toLowerCase()));
+      
   if (matched) return matched;
   // Fallback to the trimmed query itself for dynamic lookup
   return query.trim();
