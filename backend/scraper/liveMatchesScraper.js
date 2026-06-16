@@ -13,7 +13,7 @@ function resolvePlayerSlug(slugOrUrl) {
     }
 
     const cache = getPlayerCache() || [];
-    const slugNorm = slugOrUrl.trim().toLowerCase();
+    const slugNorm = slugOrUrl.trim().toLowerCase().replace(/[\s\-]+/g, "");
     const cached = cache.find(p => {
         if (!p.url) return false;
         const u = new URL(p.url);
@@ -25,7 +25,7 @@ function resolvePlayerSlug(slugOrUrl) {
     }
 
     // fallback
-    return slugOrUrl.trim();
+    return slugOrUrl.trim().replace(/[\s\-]+/g, "");
 }
 
 function parseRecentResultsFromPlayerFrag($, { limit }) {

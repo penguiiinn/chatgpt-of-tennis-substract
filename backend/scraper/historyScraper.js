@@ -48,7 +48,7 @@ async function fetchPlayerHistoryFromTennisAbstract({ slugOrUrl, limitYears = 7 
     const url =
         slugOrUrl && slugOrUrl.startsWith("http")
             ? slugOrUrl
-            : `https://www.tennisabstract.com/cgi-bin/player.cgi?p=${encodeURIComponent(slugOrUrl.trim().replace(/\s+/g, ""))}`;
+            : `https://www.tennisabstract.com/cgi-bin/player.cgi?p=${encodeURIComponent(slugOrUrl.trim().replace(/[\s\-]+/g, ""))}`;
 
     const tour = guessTourFromUrl(url);
 

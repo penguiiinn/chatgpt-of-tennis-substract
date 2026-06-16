@@ -12,6 +12,7 @@ const searchRoutes = require("./routes/searchRoutes");
 const matchupRoutes = require("./routes/matchupRoutes");
 const { warmCache } = require("./scraper/searchScraper");
 const liveRoutes = require("./routes/liveRoutes");
+const profileRoutes = require("./routes/profileRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -35,6 +36,7 @@ app.use("/api/predictions", predictionRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/matchup", matchupRoutes);
 app.use("/api/live", liveRoutes);
+app.use("/api/profile", profileRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {

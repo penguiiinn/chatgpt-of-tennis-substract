@@ -89,7 +89,7 @@ const scrapePlayerProfile = async (slugOrUrl) => {
       slug = urlObj.searchParams.get("p") || "";
       isWta = slugOrUrl.includes("wplayer.cgi") || slugOrUrl.includes("wplayer-classic.cgi");
     } else {
-      slug = slugOrUrl.trim().replace(/\s+/g, "");
+      slug = slugOrUrl.trim().replace(/[\s\-]+/g, "");
       // Query player search cache
       const cache = getPlayerCache() || [];
       const cachedPlayer = cache.find(p => {
