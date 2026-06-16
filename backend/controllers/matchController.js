@@ -1,9 +1,9 @@
 const matchService = require("../services/matchService");
 
-const getRecentMatches = (req, res) => {
+const getRecentMatches = async (req, res) => {
   try {
     const { name } = req.params;
-    const matches = matchService.getRecentMatches(name);
+    const matches = await matchService.getRecentMatches(name);
     
     if (!matches) {
       return res.status(404).json({ error: "Matches not found for this player.", query: name });
@@ -15,10 +15,10 @@ const getRecentMatches = (req, res) => {
   }
 };
 
-const getMatchDetails = (req, res) => {
+const getMatchDetails = async (req, res) => {
   try {
     const { name, index } = req.params;
-    const details = matchService.getMatchDetails(name, index);
+    const details = await matchService.getMatchDetails(name, index);
     
     if (!details) {
       return res.status(404).json({ error: "Match details not found.", query: name, index });

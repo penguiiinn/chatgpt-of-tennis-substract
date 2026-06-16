@@ -15,10 +15,10 @@ const getPlayers = (req, res) => {
   }
 };
 
-const getPlayerByName = (req, res) => {
+const getPlayerByName = async (req, res) => {
   try {
     const { name } = req.params;
-    const profile = playerService.getPlayerProfile(name);
+    const profile = await playerService.getPlayerProfile(name);
     
     if (!profile) {
       return res.status(404).json({ error: "Player profile not found.", query: name });
@@ -30,7 +30,23 @@ const getPlayerByName = (req, res) => {
   }
 };
 
+const getPlayerBySlug = async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const profile = await playerService.getPlayerProfile(slug);
+    
+    if (!profile) {
+      return res.status(404).json({ error: "Player profile not found.", query: slug });
+    }
+    
+    res.json(profile);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to scrape/retrieve player profile.", message: error.message });
+  }
+};
+
 module.exports = {
   getPlayers,
-  getPlayerByName
+  getPlayerByName,
+  getPlayerBySlug
 };

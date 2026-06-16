@@ -1,6 +1,6 @@
 const h2hService = require("../services/h2hService");
 
-const getComparison = (req, res) => {
+const getComparison = async (req, res) => {
   try {
     const { p1, p2 } = req.query;
     
@@ -8,7 +8,7 @@ const getComparison = (req, res) => {
       return res.status(400).json({ error: "Missing required query parameters: p1 and p2 must be provided." });
     }
     
-    const comparison = h2hService.getH2HComparison(p1, p2);
+    const comparison = await h2hService.getH2HComparison(p1, p2);
     
     if (!comparison) {
       return res.status(404).json({ error: "One or both players could not be found.", p1, p2 });

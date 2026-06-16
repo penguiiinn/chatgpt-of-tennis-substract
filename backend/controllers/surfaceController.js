@@ -1,9 +1,9 @@
 const surfaceService = require("../services/surfaceService");
 
-const getSurfaceData = (req, res) => {
+const getSurfaceData = async (req, res) => {
   try {
     const { name } = req.params;
-    const surfaceData = surfaceService.getSurfaceIntelligence(name);
+    const surfaceData = await surfaceService.getSurfaceIntelligence(name);
     
     if (!surfaceData) {
       return res.status(404).json({ error: "Player surface data not found.", query: name });

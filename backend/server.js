@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 
 const playerRoutes = require("./routes/playerRoutes");
+const playerDetailRoutes = require("./routes/playerDetailRoutes");
 const surfaceRoutes = require("./routes/surfaceRoutes");
 const matchRoutes = require("./routes/matchRoutes");
 const h2hRoutes = require("./routes/h2hRoutes");
@@ -24,6 +25,7 @@ app.get("/api/health", (req, res) => {
 
 // Connect Routes
 app.use("/api/players", playerRoutes);
+app.use("/api/player", playerDetailRoutes);
 app.use("/api/surfaces", surfaceRoutes);
 app.use("/api/matches", matchRoutes);
 app.use("/api/h2h", h2hRoutes);

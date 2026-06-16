@@ -1,9 +1,9 @@
 const predictionService = require("../services/predictionService");
 
-const getPredictions = (req, res) => {
+const getPredictions = async (req, res) => {
   try {
     const { name } = req.params;
-    const predictions = predictionService.getPlayerPredictions(name);
+    const predictions = await predictionService.getPlayerPredictions(name);
     
     if (!predictions) {
       return res.status(404).json({ error: "Predictions not found for this player.", query: name });
@@ -15,10 +15,10 @@ const getPredictions = (req, res) => {
   }
 };
 
-const getMatchPrediction = (req, res) => {
+const getMatchPrediction = async (req, res) => {
   try {
     const { name, opponent } = req.params;
-    const prediction = predictionService.getMatchPrediction(name, opponent);
+    const prediction = await predictionService.getMatchPrediction(name, opponent);
     
     if (!prediction) {
       return res.status(404).json({ error: "Failed to calculate prediction for this matchup.", query: name, opponent });

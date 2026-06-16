@@ -1,13 +1,13 @@
 const { getPlayerProfile } = require("./playerService");
 
-const getPlayerPredictions = (playerName) => {
-  const profile = getPlayerProfile(playerName);
+const getPlayerPredictions = async (playerName) => {
+  const profile = await getPlayerProfile(playerName);
   if (!profile) return null;
   return profile.predictions;
 };
 
-const getMatchPrediction = (playerName, opponentName) => {
-  const profile = getPlayerProfile(playerName);
+const getMatchPrediction = async (playerName, opponentName) => {
+  const profile = await getPlayerProfile(playerName);
   if (!profile) return null;
   
   // Try to find predefined prediction
@@ -24,7 +24,7 @@ const getMatchPrediction = (playerName, opponentName) => {
   }
   
   // If no predefined prediction, calculate dynamically based on Elo!
-  const opponentProfile = getPlayerProfile(opponentName);
+  const opponentProfile = await getPlayerProfile(opponentName);
   const oppName = opponentProfile ? opponentProfile.overview.name : opponentName;
   const oppElo = opponentProfile ? opponentProfile.overview.elo : 1800; // default opponent Elo if not found
   

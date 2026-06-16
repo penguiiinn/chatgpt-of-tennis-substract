@@ -141,4 +141,5 @@ module.exports = {
   searchPlayers,
   refreshCache,
   warmCache,
+  getPlayerCache: () => playerCache,
 };

@@ -6,15 +6,17 @@ function getMatchupKey(a, b) {
   return sorted.join("___");
 }
 
-const getH2HComparison = (p1, p2) => {
+const getH2HComparison = async (p1, p2) => {
   const k1 = resolvePlayerKey(p1);
   const k2 = resolvePlayerKey(p2);
   
   if (!k1 || !k2) return null;
   if (k1 === k2) return { error: "Cannot compare a player to themselves." };
   
-  const pa = PROFILE_DB[k1];
-  const pb = PROFILE_DB[k2];
+  const pa = await getPlayerProfile(k1);
+  const pb = await getPlayerProfile(k2);
+  
+  if (!pa || !pb) return null;
   
   const matchupKey = getMatchupKey(k1, k2);
   
@@ -72,8 +74,8 @@ const getH2HComparison = (p1, p2) => {
     };
     
     style = {
-      aStyle: pa.aiInsights.tags[0] || "All-Court",
-      bStyle: pb.aiInsights.tags[0] || "Baseline",
+      aStyle: (pa.aiInsights && pa.aiInsights.tags && pa.aiInsights.tags[0]) || "All-Court",
+      bStyle: (pb.aiInsights && pb.aiInsights.tags && pb.aiInsights.tags[0]) || "Baseline",
       clashPoints: [
         { icon: "🎯", title: "Serve vs. Return", text: `${pa.overview.name}'s serve rating is ${pa.strengthMeter.serve} against ${pb.overview.name}'s return rating of ${pb.strengthMeter.return}.` },
         { icon: "🧠", title: "Mental Composure", text: `${pa.overview.name}'s pressure performance is ${pa.strengthMeter.pressurePoints} while ${pb.overview.name}'s is ${pb.strengthMeter.pressurePoints}.` }

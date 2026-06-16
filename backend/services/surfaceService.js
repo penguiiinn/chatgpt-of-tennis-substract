@@ -1,7 +1,7 @@
 const { getPlayerProfile } = require("./playerService");
 
-const getSurfaceIntelligence = (playerName) => {
-  const profile = getPlayerProfile(playerName);
+const getSurfaceIntelligence = async (playerName) => {
+  const profile = await getPlayerProfile(playerName);
   if (!profile) return null;
   
   return {

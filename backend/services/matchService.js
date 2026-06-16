@@ -18,14 +18,14 @@ function createSeededRandom(seed) {
   };
 }
 
-const getRecentMatches = (playerName) => {
-  const profile = getPlayerProfile(playerName);
+const getRecentMatches = async (playerName) => {
+  const profile = await getPlayerProfile(playerName);
   if (!profile) return null;
   return profile.recentMatches;
 };
 
-const getMatchDetails = (playerName, matchIndex) => {
-  const profile = getPlayerProfile(playerName);
+const getMatchDetails = async (playerName, matchIndex) => {
+  const profile = await getPlayerProfile(playerName);
   if (!profile) return null;
   
   const mIndex = parseInt(matchIndex);
