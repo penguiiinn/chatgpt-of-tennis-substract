@@ -331,6 +331,11 @@ const scrapePlayerProfile = async (slugOrUrl) => {
 
       const mappedName = sName === "carpet" ? "indoor" : sName;
 
+      let eloVal = eloRating;
+      if (mappedName === "hard" || mappedName === "indoor") eloVal = hardElo;
+      else if (mappedName === "clay") eloVal = clayElo;
+      else if (mappedName === "grass") eloVal = grassElo;
+
       surfaces[mappedName] = {
         winPct,
         holdPct,
@@ -339,7 +344,8 @@ const scrapePlayerProfile = async (slugOrUrl) => {
         returnRating: Math.round(breakPct * 2),
         tiebreakRecord,
         last52: { wins, losses, winPct: last52WinPct },
-        strength
+        strength,
+        elo: eloVal
       };
     });
 

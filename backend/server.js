@@ -9,6 +9,7 @@ const matchRoutes = require("./routes/matchRoutes");
 const h2hRoutes = require("./routes/h2hRoutes");
 const predictionRoutes = require("./routes/predictionRoutes");
 const searchRoutes = require("./routes/searchRoutes");
+const matchupRoutes = require("./routes/matchupRoutes");
 const { warmCache } = require("./scraper/searchScraper");
 
 const app = express();
@@ -31,6 +32,7 @@ app.use("/api/matches", matchRoutes);
 app.use("/api/h2h", h2hRoutes);
 app.use("/api/predictions", predictionRoutes);
 app.use("/api/search", searchRoutes);
+app.use("/api/matchup", matchupRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {
