@@ -8,5 +8,6 @@ const playerController = require("../controllers/playerController");
  * Retrieve scraped player profile by Tennis Abstract URL or slug.
  */
 router.get("/:slug", playerController.getPlayerBySlug);
+router.get("/:slug/insights", playerController.getPlayerInsights);
 
 module.exports = router;

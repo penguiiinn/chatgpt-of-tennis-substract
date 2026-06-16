@@ -214,6 +214,7 @@ const scrapePlayerProfile = async (slugOrUrl) => {
     let firstServeWonPct = 65;
     let secondServeWonPct = 48;
     let returnPointsWon = 40;
+    let careerTbPct = 50.0;
 
     $("#tour-years tbody tr").each((i, tr) => {
       const tds = $(tr).find("td");
@@ -229,6 +230,7 @@ const scrapePlayerProfile = async (slugOrUrl) => {
         firstServeWonPct = parseFloat(tds.eq(17).text().trim()) || 65;
         secondServeWonPct = parseFloat(tds.eq(18).text().trim()) || 48;
         returnPointsWon = parseFloat(tds.eq(20).text().trim()) || 40;
+        careerTbPct = parseFloat(tds.eq(10).text().trim()) || 50.0;
       } else if (i === 0) {
         ytdWL = `${tds.eq(2).text().trim()}-${tds.eq(3).text().trim()}`;
         ytdWinPct = parseFloat(tds.eq(4).text().trim()) || 50.0;
@@ -401,6 +403,9 @@ const scrapePlayerProfile = async (slugOrUrl) => {
       }
     });
 
+    const top10Data = parseSurfaceRow("#career-splits", "vs Top 10");
+    const top10WinPct = top10Data ? top10Data.winPct : 0.0;
+
     const countryDetails = getCountryDetails(countryCode);
     const handedness = hand === "L" ? "Left-Handed" : "Right-Handed";
     const backhandType = backhand === "1" ? "One-Handed" : "Two-Handed";
@@ -427,7 +432,9 @@ const scrapePlayerProfile = async (slugOrUrl) => {
         ytdWinLoss: ytdWL,
         ytdWinPct,
         prizeMoney: "N/A",
-        titlesTotal
+        titlesTotal,
+        tiebreakPct: careerTbPct,
+        top10WinPct
       },
       surfaces,
       bestSurface,

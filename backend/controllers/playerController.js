@@ -1,4 +1,5 @@
 const playerService = require("../services/playerService");
+const { generatePlayerInsights } = require("../utils/playerInsights");
 
 const getPlayers = (req, res) => {
   try {
@@ -45,8 +46,30 @@ const getPlayerBySlug = async (req, res) => {
   }
 };
 
+const getPlayerInsights = async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const profile = await playerService.getPlayerProfile(slug);
+    
+    if (!profile) {
+      return res.status(404).json({ error: "Player profile not found for insights calculation.", query: slug });
+    }
+    
+    const insights = generatePlayerInsights(profile);
+    
+    res.json({
+      player: profile.overview.name,
+      rawStats: profile,
+      insights
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to generate player insights.", message: error.message });
+  }
+};
+
 module.exports = {
   getPlayers,
   getPlayerByName,
-  getPlayerBySlug
+  getPlayerBySlug,
+  getPlayerInsights
 };
