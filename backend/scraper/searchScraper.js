@@ -101,10 +101,13 @@ async function searchPlayers(query, limit = 20) {
 
   const q = query.trim().toLowerCase();
 
+  console.log(`[SearchScraper] Incoming query: "${query}" (normalized: "${q}")`);
+
   // Score-based ranking: exact match > starts-with > includes
-  const results = playerCache
+  const resultsWithScore = playerCache
     .map(p => {
       const lower = p.name.toLowerCase();
+
       let score = 0;
       if (lower === q) score = 100;
       else if (lower.startsWith(q)) score = 80;
@@ -118,14 +121,19 @@ async function searchPlayers(query, limit = 20) {
         ).length;
         if (matchCount > 0) score = 40 + matchCount * 10;
       }
+
       return { ...p, score };
     })
-    .filter(p => p.score > 0)
+    .filter(p => p.score > 0);
+
+  const results = resultsWithScore
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
     .slice(0, limit)
     .map(({ score, ...rest }) => rest); // strip internal score
 
+  console.log(`[SearchScraper] Matched players: ${results.length}`);
   return results;
+
 }
 
 /**
