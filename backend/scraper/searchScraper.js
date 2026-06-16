@@ -84,9 +84,13 @@ async function refreshCache() {
     lastCacheTime = Date.now();
     console.log(`[SearchScraper] Cache populated with ${playerCache.length} players`);
   } else {
-    console.warn("[SearchScraper] Both scrapes returned empty – keeping old cache");
+    // If cache is empty, do not keep a stale empty dataset.
+    console.warn("[SearchScraper] Both scrapes returned empty. Player cache will remain empty.");
+    playerCache = [];
+    lastCacheTime = Date.now();
   }
 }
+
 
 /**
  * Search for players whose name matches the query (case-insensitive substring).
@@ -99,9 +103,21 @@ async function searchPlayers(query, limit = 20) {
 
   if (!query || !query.trim()) return [];
 
+  // If cache is still empty (e.g., scrape failed or blocked), try one more time.
+  if (!playerCache || playerCache.length === 0) {
+    console.warn("[SearchScraper] Player cache empty after refresh. Attempting one more refresh.");
+    await refreshCache();
+  }
+
+  if (!playerCache || playerCache.length === 0) {
+    console.warn("[SearchScraper] Player cache remains empty; returning no results.");
+    return [];
+  }
+
   const q = query.trim().toLowerCase();
 
   console.log(`[SearchScraper] Incoming query: "${query}" (normalized: "${q}")`);
+
 
   // Score-based ranking: exact match > starts-with > includes
   const resultsWithScore = playerCache
