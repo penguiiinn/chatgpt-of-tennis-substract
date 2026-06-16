@@ -17,6 +17,8 @@ const profileRoutes = require("./routes/profileRoutes");
 const predictionEngineRoutes = require("./routes/predictionRoutes");
 // Step 7 — Betting Intelligence Layer
 const bettingRoutes = require("./routes/bettingRoutes");
+// Step 8 — Tournament Mode
+const tournamentRoutes = require("./routes/tournamentRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -45,6 +47,8 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/prediction", predictionEngineRoutes);
 // Step 7 — Betting Intelligence Layer
 app.use("/api/betting", bettingRoutes);
+// Step 8 — Tournament Mode
+app.use("/api/tournament", tournamentRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {
