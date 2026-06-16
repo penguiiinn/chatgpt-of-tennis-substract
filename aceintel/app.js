@@ -114,7 +114,10 @@
     let abortController = null;
 
     const showLoading = () => {
+      dropdown.classList.remove("hidden");
       dropdown.classList.add("open");
+      dropdown.style.display = "block";
+      dropdown.style.zIndex = "1100";
       dropdown.innerHTML = `
         <div style="padding:12px 16px;color:var(--text-muted);font-size:0.85rem;display:flex;align-items:center;gap:10px">
           <span class="spinner" style="width:12px;height:12px;border-radius:50%;border:2px solid rgba(255,255,255,0.25);border-top-color:var(--accent);display:inline-block;animation:spin .7s linear infinite"></span>
@@ -127,11 +130,15 @@
       if (dropdown.innerHTML.includes("Searching…")) {
         dropdown.innerHTML = "";
         dropdown.classList.remove("open");
+        dropdown.classList.add("hidden");
+        dropdown.style.display = "none";
       }
     };
 
     const clearDropdown = () => {
       dropdown.classList.remove("open");
+      dropdown.classList.add("hidden");
+      dropdown.style.display = "none";
       dropdown.innerHTML = "";
       activeIdx = -1;
     };
@@ -150,6 +157,8 @@
       input.dataset.name = pickedName;
 
       dropdown.classList.remove("open");
+      dropdown.classList.add("hidden");
+      dropdown.style.display = "none";
       dropdown.innerHTML = "";
       activeIdx = -1;
 
@@ -186,7 +195,10 @@
           `;
         }).join("");
 
+        dropdown.classList.remove("hidden");
         dropdown.classList.add("open");
+        dropdown.style.display = "block";
+        dropdown.style.zIndex = "1100";
 
         dropdown.querySelectorAll(".search-dropdown-item").forEach((item, idx) => {
           item.addEventListener("click", () => setSelection(item));
@@ -202,7 +214,10 @@
         items.forEach((it, idx) => it.classList.toggle("highlighted", idx === activeIdx));
       } else {
         dropdown.innerHTML = `<div class="search-dropdown-empty">No results found</div>`;
+        dropdown.classList.remove("hidden");
         dropdown.classList.add("open");
+        dropdown.style.display = "block";
+        dropdown.style.zIndex = "1100";
       }
       console.log("render complete");
     };
@@ -369,8 +384,11 @@
         const dropdown = document.createElement("div");
         dropdown.className = "search-dropdown";
         dropdown.style.position = "absolute";
+        dropdown.style.top = "100%";
+        dropdown.style.left = "0";
         dropdown.style.marginTop = "6px";
         dropdown.style.minWidth = "260px";
+        dropdown.style.zIndex = "1100"; // Ensure z-index is above navbar
 
         // wrap position for dropdown
         navSearchWrap.style.position = "relative";
@@ -393,8 +411,20 @@
         attachAutocompleteToInput({ input, dropdown, contextName: "navbar" });
       } else {
         const input = navSearchWrap.querySelector("#nav-search");
-        const dropdown = navSearchWrap.querySelector(".search-dropdown");
+        let dropdown = navSearchWrap.querySelector(".search-dropdown");
+        if (!dropdown && input) {
+          dropdown = document.createElement("div");
+          dropdown.className = "search-dropdown";
+          navSearchWrap.appendChild(dropdown);
+        }
         if (input && dropdown) {
+          navSearchWrap.style.position = "relative";
+          dropdown.style.position = "absolute";
+          dropdown.style.top = "100%";
+          dropdown.style.left = "0";
+          dropdown.style.marginTop = "6px";
+          dropdown.style.minWidth = "260px";
+          dropdown.style.zIndex = "1100"; // Ensure z-index is above navbar
           attachAutocompleteToInput({ input, dropdown, contextName: "navbar" });
         }
       }
