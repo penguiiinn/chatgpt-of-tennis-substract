@@ -12,77 +12,37 @@ const $$ = (sel) => document.querySelectorAll(sel);
 
 // ─── Init ───────────────────────────
 document.addEventListener("DOMContentLoaded", async () => {
-  await fetchPlayersList();
-  populateDropdowns();
   initNav();
   initSelector();
+  initAutocomplete();
 
   // Pre-fill from URL params
   const params = new URLSearchParams(window.location.search);
   const ua = params.get("p1");
   const ub = params.get("p2");
   if (ua && ub) {
-    const k1 = resolveKey(ua);
-    const k2 = resolveKey(ub);
-    if (k1 && k2) {
-      $("#sel-p1").value = k1;
-      $("#sel-p2").value = k2;
-      buildReport(k1, k2);
-    }
+    $("#input-p1").value = ua;
+    $("#input-p2").value = ub;
+    buildReport(ua, ub);
   }
 });
 
-async function fetchPlayersList() {
-  try {
-    const res = await fetch(`${API_BASE}/players`);
-    if (res.ok) {
-      playersList = await res.json();
-    }
-  } catch (err) {
-    console.warn("Failed to fetch players list from API, using static fallback.", err);
-  }
-}
-
-function resolveKey(q) {
-  const keys = (playersList && playersList.length > 0)
-    ? playersList.map(p => p.name)
-    : Object.keys(PROFILE_DB);
-  return keys.find(k => k.toLowerCase() === q.toLowerCase())
-    || keys.find(k => k.toLowerCase().includes(q.toLowerCase()));
-}
-
-// ─── Dropdowns ──────────────────────
-function populateDropdowns() {
-  const players = (playersList && playersList.length > 0)
-    ? playersList.map(p => p.name)
-    : H2H_PLAYERS;
-  ["sel-p1", "sel-p2"].forEach(id => {
-    const sel = $(`#${id}`);
-    sel.innerHTML = '<option value="">Choose player…</option>';
-    players.forEach(name => {
-      const p = PROFILE_DB[name] || { overview: { flag: "🎾", name: name } };
-      const opt = document.createElement("option");
-      opt.value = name;
-      opt.textContent = `${p.overview.flag} ${p.overview.name}`;
-      sel.appendChild(opt);
-    });
-  });
-}
-
-// ─── Nav ────────────────────────────
+// ─── Navbar & Navigation ─────────────
 function initNav() {
   const toggle = $("#nav-toggle");
   const links = $("#nav-links");
 
-  toggle.addEventListener("click", () => {
-    toggle.classList.toggle("active");
-    links.classList.toggle("open");
-  });
+  if (toggle && links) {
+    toggle.addEventListener("click", () => {
+      toggle.classList.toggle("active");
+      links.classList.toggle("open");
+    });
+  }
 
   $$(".nav-link").forEach(l => {
     l.addEventListener("click", () => {
-      toggle.classList.remove("active");
-      links.classList.remove("open");
+      if (toggle) toggle.classList.remove("active");
+      if (links) links.classList.remove("open");
     });
   });
 
@@ -106,18 +66,141 @@ function initNav() {
   });
 }
 
+// Helper to extract player slug from Tennis Abstract URL
+function extractSlug(url) {
+  if (!url) return "";
+  try {
+    const urlObj = new URL(url, "https://www.tennisabstract.com");
+    return urlObj.searchParams.get("p") || "";
+  } catch (e) {
+    return "";
+  }
+}
+
+// ─── Autocomplete live search ────────
+function initAutocomplete() {
+  const setupField = (inputId, resultsId) => {
+    const input = $(`#${inputId}`);
+    const results = $(`#${resultsId}`);
+    let debounceTimer;
+
+    input.addEventListener("input", () => {
+      // Clear stored selection on manual typing
+      delete input.dataset.slug;
+      delete input.dataset.name;
+
+      clearTimeout(debounceTimer);
+      const query = input.value.trim();
+
+      if (query.length < 2) {
+        results.innerHTML = "";
+        results.classList.add("hidden");
+        return;
+      }
+
+      debounceTimer = setTimeout(async () => {
+        // Loading state
+        results.classList.remove("hidden");
+        results.innerHTML = `<div style="padding:12px 16px;color:var(--text-muted);font-size:0.85rem;display:flex;align-items:center;gap:10px">
+          <span class="spinner" style="width:12px;height:12px;border-radius:50%;border:2px solid rgba(255,255,255,0.25);border-top-color:var(--accent);display:inline-block;animation:spin .7s linear infinite"></span>
+          Searching…
+        </div>`;
+        input.setAttribute("aria-busy", "true");
+
+        try {
+          const res = await fetch(`${API_BASE}/search?name=${encodeURIComponent(query)}`);
+          if (!res.ok) throw new Error("Search failed");
+          const matches = await res.json();
+
+          if (matches.length === 0) {
+            results.innerHTML = `<div style="padding:12px 16px;color:var(--text-muted);font-size:0.85rem">No players found</div>`;
+            results.classList.remove("hidden");
+            return;
+          }
+
+          results.innerHTML = matches.map(m => {
+            const tourBadgeClass = m.tour.toLowerCase() === "atp" ? "atp" : "wta";
+            const slug = extractSlug(m.url);
+            return `
+              <div class="search-result-item" data-name="${m.name}" data-slug="${slug}">
+                <span>${m.name}</span>
+                <span class="tour-badge ${tourBadgeClass}">${m.tour.toUpperCase()}</span>
+              </div>
+            `;
+          }).join("");
+          results.classList.remove("hidden");
+
+          // Bind click events on items
+          results.querySelectorAll(".search-result-item").forEach(item => {
+            item.addEventListener("click", () => {
+              const pickedName = item.getAttribute("data-name");
+              const pickedSlug = item.getAttribute("data-slug");
+              const otherInput = inputId === "input-p1" ? $("#input-p2") : $("#input-p1");
+              const otherSlug = otherInput?.dataset?.slug;
+
+              // Prevent duplicate selection
+              if (otherSlug && otherSlug === pickedSlug) {
+                showToast("Pick a different player for Player 2.");
+                return;
+              }
+
+              input.value = pickedName;
+              input.dataset.name = pickedName;
+              input.dataset.slug = pickedSlug;
+
+              results.classList.add("hidden");
+              input.removeAttribute("aria-busy");
+
+              // Clear the other dropdown so UX stays clean
+              const otherResults = inputId === "input-p1" ? $("#results-p2") : $("#results-p1");
+              if (otherResults) otherResults.classList.add("hidden");
+            });
+          });
+
+        } catch (err) {
+          console.warn("Failed to fetch search results:", err);
+        } finally {
+          input.removeAttribute("aria-busy");
+        }
+      }, 300);
+    });
+
+    // Hide dropdown on blur/click away, but delay slightly so clicks can register
+    document.addEventListener("click", (e) => {
+      if (!input.contains(e.target) && !results.contains(e.target)) {
+        results.classList.add("hidden");
+      }
+    });
+
+    // Show again if clicked and contains query
+    input.addEventListener("click", () => {
+      if (input.value.trim().length >= 2 && results.innerHTML !== "") {
+        results.classList.remove("hidden");
+      }
+    });
+  };
+
+  setupField("input-p1", "results-p1");
+  setupField("input-p2", "results-p2");
+}
+
 // ─── Selector ───────────────────────
 function initSelector() {
   $("#btn-compare").addEventListener("click", () => {
-    const a = $("#sel-p1").value;
-    const b = $("#sel-p2").value;
-    if (!a || !b) { showToast("Please select both players."); return; }
-    if (a === b) { showToast("Please select two different players."); return; }
+    const p1 = $("#input-p1");
+    const p2 = $("#input-p2");
+
+    const a = p1.dataset.slug;
+    const b = p2.dataset.slug;
+
+    if (!a || !b) { showToast("Please select both players from the suggestions."); return; }
+    if (a.toLowerCase() === b.toLowerCase()) { showToast("Please select two different players."); return; }
+
 
     // Update URL
     const url = new URL(window.location);
-    url.searchParams.set("p1", a);
-    url.searchParams.set("p2", b);
+    url.searchParams.set("p1", p1.dataset.name || p1.value.trim());
+    url.searchParams.set("p2", p2.dataset.name || p2.value.trim());
     window.history.pushState({}, "", url);
 
     buildReport(a, b);
@@ -562,7 +645,7 @@ function renderPredictNew(pa, pb, mi) {
   }
 
   const confCls = mi.confidence.toLowerCase() === "high" ? "confidence-high" : mi.confidence.toLowerCase() === "medium" ? "confidence-medium" : "confidence-low";
-  
+
   const advantagesHtml = mi.advantages.map(a => `
     <li class="prob-reason" style="display:flex;align-items:flex-start;gap:8px;margin-bottom:10px;">
       <span style="color:var(--green);font-weight:bold;margin-top:1px;">✓</span>
@@ -580,7 +663,7 @@ function renderPredictNew(pa, pb, mi) {
   // Determine progress bar fill percentages
   const p1Name = pa.overview.name;
   const p2Name = pb.overview.name;
-  
+
   let fillPctL = 50;
   let fillPctR = 50;
   if (mi.favorite === p1Name) {
