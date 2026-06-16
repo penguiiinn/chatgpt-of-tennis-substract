@@ -81,11 +81,22 @@
   }
 
   // ═══════════════════════════════════════
-  // SEARCH
+  // SEARCH (Dynamic – Tennis Abstract)
   // ═══════════════════════════════════════
+  let searchTimeout = null;
+  let activeDropdownIdx = -1;
+
   function initSearch() {
     const input = $("#hero-search");
     const btn = $("#btn-analyze");
+    const searchBox = $("#hero-search-box");
+
+    // Create dropdown container
+    const dropdown = document.createElement("div");
+    dropdown.className = "search-dropdown";
+    dropdown.id = "search-dropdown";
+    searchBox.style.position = "relative";
+    searchBox.appendChild(dropdown);
 
     btn.addEventListener("click", () => {
       const query = input.value.trim();
@@ -93,30 +104,143 @@
     });
 
     input.addEventListener("keydown", (e) => {
+      const items = dropdown.querySelectorAll(".search-dropdown-item");
       if (e.key === "Enter") {
-        const query = input.value.trim();
-        if (query) searchPlayer(query);
+        e.preventDefault();
+        if (activeDropdownIdx >= 0 && items[activeDropdownIdx]) {
+          items[activeDropdownIdx].click();
+        } else {
+          const query = input.value.trim();
+          if (query) searchPlayer(query);
+        }
+        return;
+      }
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        activeDropdownIdx = Math.min(activeDropdownIdx + 1, items.length - 1);
+        updateDropdownHighlight(items);
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        activeDropdownIdx = Math.max(activeDropdownIdx - 1, -1);
+        updateDropdownHighlight(items);
+      }
+      if (e.key === "Escape") {
+        dropdown.classList.remove("open");
+        activeDropdownIdx = -1;
+      }
+    });
+
+    input.addEventListener("input", () => {
+      const query = input.value.trim();
+      if (searchTimeout) clearTimeout(searchTimeout);
+      if (query.length < 2) {
+        dropdown.classList.remove("open");
+        dropdown.innerHTML = "";
+        return;
+      }
+      searchTimeout = setTimeout(() => fetchSearchResults(query, dropdown), 250);
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener("click", (e) => {
+      if (!searchBox.contains(e.target)) {
+        dropdown.classList.remove("open");
+        activeDropdownIdx = -1;
       }
     });
   }
 
-  function searchPlayer(query) {
-    // Find closest match
+  async function fetchSearchResults(query, dropdown) {
+    try {
+      const res = await fetch(`${API_BASE}/search?name=${encodeURIComponent(query)}&limit=10`);
+      if (!res.ok) throw new Error("Search API error");
+      const results = await res.json();
+
+      if (results.length === 0) {
+        dropdown.innerHTML = `<div class="search-dropdown-empty">No players found for "${query}"</div>`;
+        dropdown.classList.add("open");
+        return;
+      }
+
+      activeDropdownIdx = -1;
+      dropdown.innerHTML = results.map((p, i) => `
+        <div class="search-dropdown-item" data-name="${p.name}" data-url="${p.url}" data-tour="${p.tour}">
+          <div class="search-dropdown-avatar">${getInitials(p.name)}</div>
+          <div class="search-dropdown-info">
+            <div class="search-dropdown-name">${highlightMatch(p.name, query)}</div>
+            <div class="search-dropdown-tour">${p.tour}</div>
+          </div>
+        </div>
+      `).join("");
+
+      dropdown.querySelectorAll(".search-dropdown-item").forEach(item => {
+        item.addEventListener("click", () => {
+          const name = item.dataset.name;
+          $("#hero-search").value = name;
+          dropdown.classList.remove("open");
+          window.location.href = `player.html?player=${encodeURIComponent(name)}`;
+        });
+      });
+
+      dropdown.classList.add("open");
+    } catch (err) {
+      console.warn("Live search failed, falling back to static:", err);
+      // Fallback to static search
+      fallbackStaticDropdown(query, dropdown);
+    }
+  }
+
+  function fallbackStaticDropdown(query, dropdown) {
     const keys = (playersList && playersList.length > 0)
       ? playersList.map(p => p.name)
       : Object.keys(PLAYERS_DB);
-    const match = keys.find(
-      (k) => k.toLowerCase() === query.toLowerCase()
-    ) || keys.find(
-      (k) => k.toLowerCase().includes(query.toLowerCase())
-    );
+    const matches = keys.filter(k => k.toLowerCase().includes(query.toLowerCase())).slice(0, 10);
 
-    if (match) {
-      // Navigate to deep player profile page
-      window.location.href = `player.html?player=${encodeURIComponent(match)}`;
+    if (matches.length === 0) {
+      dropdown.innerHTML = `<div class="search-dropdown-empty">No players found</div>`;
     } else {
-      showToast(`Player "${query}" not found. Try: ${keys.join(", ")}`);
+      dropdown.innerHTML = matches.map(name => `
+        <div class="search-dropdown-item" data-name="${name}">
+          <div class="search-dropdown-avatar">${getInitials(name)}</div>
+          <div class="search-dropdown-info">
+            <div class="search-dropdown-name">${highlightMatch(name, query)}</div>
+            <div class="search-dropdown-tour">Local</div>
+          </div>
+        </div>
+      `).join("");
+      dropdown.querySelectorAll(".search-dropdown-item").forEach(item => {
+        item.addEventListener("click", () => {
+          const name = item.dataset.name;
+          $("#hero-search").value = name;
+          dropdown.classList.remove("open");
+          window.location.href = `player.html?player=${encodeURIComponent(name)}`;
+        });
+      });
     }
+    dropdown.classList.add("open");
+  }
+
+  function highlightMatch(text, query) {
+    const idx = text.toLowerCase().indexOf(query.toLowerCase());
+    if (idx < 0) return text;
+    return text.slice(0, idx) +
+      `<span class="search-highlight">${text.slice(idx, idx + query.length)}</span>` +
+      text.slice(idx + query.length);
+  }
+
+  function updateDropdownHighlight(items) {
+    items.forEach((it, i) => {
+      it.classList.toggle("highlighted", i === activeDropdownIdx);
+    });
+    if (activeDropdownIdx >= 0 && items[activeDropdownIdx]) {
+      items[activeDropdownIdx].scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  function searchPlayer(query) {
+    // Navigate directly — the player page will handle resolution
+    window.location.href = `player.html?player=${encodeURIComponent(query)}`;
   }
 
   // ═══════════════════════════════════════
@@ -194,6 +318,10 @@
   // COMPARE
   // ═══════════════════════════════════════
   function initCompare() {
+    // Add autocomplete to both compare inputs
+    attachCompareAutocomplete($("#compare-p1"));
+    attachCompareAutocomplete($("#compare-p2"));
+
     $("#btn-compare").addEventListener("click", () => {
       const p1 = $("#compare-p1").value.trim();
       const p2 = $("#compare-p2").value.trim();
@@ -205,15 +333,73 @@
     });
   }
 
+  function attachCompareAutocomplete(input) {
+    const wrapper = input.parentElement;
+    wrapper.style.position = "relative";
+
+    const dd = document.createElement("div");
+    dd.className = "search-dropdown compare-dropdown";
+    wrapper.appendChild(dd);
+
+    let timer = null;
+    input.addEventListener("input", () => {
+      const q = input.value.trim();
+      if (timer) clearTimeout(timer);
+      if (q.length < 2) { dd.classList.remove("open"); dd.innerHTML = ""; return; }
+      timer = setTimeout(async () => {
+        try {
+          const res = await fetch(`${API_BASE}/search?name=${encodeURIComponent(q)}&limit=8`);
+          if (!res.ok) throw new Error();
+          const results = await res.json();
+          if (!results.length) { dd.innerHTML = `<div class="search-dropdown-empty">No players found</div>`; dd.classList.add("open"); return; }
+          dd.innerHTML = results.map(p => `
+            <div class="search-dropdown-item" data-name="${p.name}">
+              <div class="search-dropdown-avatar">${getInitials(p.name)}</div>
+              <div class="search-dropdown-info">
+                <div class="search-dropdown-name">${highlightMatch(p.name, q)}</div>
+                <div class="search-dropdown-tour">${p.tour}</div>
+              </div>
+            </div>
+          `).join("");
+          dd.querySelectorAll(".search-dropdown-item").forEach(item => {
+            item.addEventListener("click", () => {
+              input.value = item.dataset.name;
+              dd.classList.remove("open");
+            });
+          });
+          dd.classList.add("open");
+        } catch { /* silent fail */ }
+      }, 250);
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!wrapper.contains(e.target)) dd.classList.remove("open");
+    });
+  }
+
   async function renderCompare(q1, q2) {
-    const keys = (playersList && playersList.length > 0)
-      ? playersList.map(p => p.name)
-      : Object.keys(PLAYERS_DB);
-    const m1 = keys.find(k => k.toLowerCase().includes(q1.toLowerCase()));
-    const m2 = keys.find(k => k.toLowerCase().includes(q2.toLowerCase()));
+    // Try resolving via search API first
+    let m1 = null, m2 = null;
+    try {
+      const [r1, r2] = await Promise.all([
+        fetch(`${API_BASE}/search?name=${encodeURIComponent(q1)}&limit=1`).then(r => r.json()),
+        fetch(`${API_BASE}/search?name=${encodeURIComponent(q2)}&limit=1`).then(r => r.json()),
+      ]);
+      if (r1.length) m1 = r1[0].name;
+      if (r2.length) m2 = r2[0].name;
+    } catch { /* fallback below */ }
+
+    // Fallback to static keys
+    if (!m1 || !m2) {
+      const keys = (playersList && playersList.length > 0)
+        ? playersList.map(p => p.name)
+        : Object.keys(PLAYERS_DB);
+      if (!m1) m1 = keys.find(k => k.toLowerCase().includes(q1.toLowerCase()));
+      if (!m2) m2 = keys.find(k => k.toLowerCase().includes(q2.toLowerCase()));
+    }
 
     if (!m1 || !m2) {
-      showToast(`Could not find one or both players. Available: ${keys.join(", ")}`);
+      showToast(`Could not find one or both players.`);
       return;
     }
 

@@ -1094,3 +1094,107 @@
   .profile-name { font-size: 1.5rem; }
   .profile-avatar { width: 68px; height: 68px; font-size: 1.4rem; }
 }
+
+/* AI Summary Insights Extension */
+.insights-top-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 28px;
+  margin-bottom: 28px;
+}
+
+@media (max-width: 768px) {
+  .insights-top-row {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+.insights-playstyle-box {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 20px;
+}
+
+.insight-box-title {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.style-tag {
+  background: var(--gradient-hero) !important;
+  color: #fff !important;
+  border: none !important;
+}
+
+.insights-grid-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+}
+
+@media (max-width: 768px) {
+  .insights-grid-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+.insights-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.insights-col-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.insights-col-title.strength-title { color: var(--green); }
+.insights-col-title.weakness-title { color: var(--red); }
+.insights-col-title.surface-title { color: var(--cyan); }
+.insights-col-title.form-title { color: var(--amber); }
+
+.insights-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.insight-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.insight-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: bold;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.strength-icon { background: var(--green-dim); color: var(--green); }
+.weakness-icon { background: var(--red-dim); color: var(--red); }
+.surface-icon { background: var(--cyan-dim); color: var(--cyan); }
+.form-icon { background: var(--amber-dim); color: var(--amber); }

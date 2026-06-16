@@ -131,16 +131,23 @@ function switchPlayer(query) {
 // ═══════════════════════════════════════
 async function loadProfile(key) {
   let p = null;
+  let insights = null;
   try {
-    const res = await fetch(`${API_BASE}/players/${encodeURIComponent(key)}`);
+    const res = await fetch(`${API_BASE}/player/${encodeURIComponent(key)}/insights`);
     if (res.ok) {
-      p = await res.json();
+      const data = await res.json();
+      p = data.rawStats;
+      insights = data.insights;
     } else {
       p = PROFILE_DB[key];
+      insights = getMockInsights(p);
     }
   } catch (err) {
-    console.warn("Failed to fetch player profile from API, using fallback.", err);
+    console.warn("Failed to fetch player insights from API, using fallback.", err);
     p = PROFILE_DB[key];
+    if (p) {
+      insights = getMockInsights(p);
+    }
   }
 
   if (!p) return;
@@ -152,7 +159,7 @@ async function loadProfile(key) {
   renderServe(p);
   renderReturn(p);
   renderStrength(p);
-  renderAISummary(p);
+  renderAISummary(p, insights);
   populatePredictDropdown(p);
   // Hide prediction result when switching
   const pr = $("#predict-result");
@@ -699,9 +706,10 @@ function getStrengthLabel(val) {
 // ═══════════════════════════════════════
 // AI SUMMARY
 // ═══════════════════════════════════════
-function renderAISummary(p) {
+function renderAISummary(p, insights) {
   const card = $("#ai-summary-card");
-  card.innerHTML = `
+  if (!insights) {
+    card.innerHTML = `
       <div class="ai-summary-header">
         <div class="ai-summary-icon">🤖</div>
         <div class="ai-summary-label">
@@ -711,6 +719,125 @@ function renderAISummary(p) {
       </div>
       <p class="ai-summary-text">${p.aiSummary}</p>
     `;
+    return;
+  }
+
+  const strengthsHtml = insights.strengths.map(s => `
+    <li class="insight-item strength-item">
+      <span class="insight-icon strength-icon">✓</span>
+      <span class="insight-text">${s}</span>
+    </li>
+  `).join("");
+
+  const weaknessesHtml = insights.weaknesses.map(w => `
+    <li class="insight-item weakness-item">
+      <span class="insight-icon weakness-icon">⚠</span>
+      <span class="insight-text">${w}</span>
+    </li>
+  `).join("");
+
+  const surfaceHtml = insights.surfaceInsights.map(si => `
+    <li class="insight-item surface-item">
+      <span class="insight-icon surface-icon">🏟️</span>
+      <span class="insight-text">${si}</span>
+    </li>
+  `).join("");
+
+  const formHtml = insights.recentFormInsights.map(fi => `
+    <li class="insight-item form-item">
+      <span class="insight-icon form-icon">📈</span>
+      <span class="insight-text">${fi}</span>
+    </li>
+  `).join("");
+
+  const playStyleHtml = insights.playStyle.map(ps => `
+    <span class="profile-tag style-tag">${ps}</span>
+  `).join("");
+
+  card.innerHTML = `
+    <div class="ai-summary-header">
+      <div class="ai-summary-icon">🤖</div>
+      <div class="ai-summary-label">
+        <h3>AI Intelligence Report — ${p.overview.name}</h3>
+        <p>Dynamic analysis powered by AceIntel matchup intelligence</p>
+      </div>
+    </div>
+    
+    <div class="insights-top-row">
+      <div class="insights-bio-summary">
+        <p class="ai-summary-text">${p.aiSummary}</p>
+      </div>
+      <div class="insights-playstyle-box">
+        <span class="insight-box-title">Play Style & Tags</span>
+        <div class="profile-tags style-tags-container" style="margin-top: 10px">
+          ${playStyleHtml}
+        </div>
+      </div>
+    </div>
+
+    <div class="insights-grid-layout">
+      <div class="insights-col">
+        <h4 class="insights-col-title strength-title">Key Strengths</h4>
+        <ul class="insights-list" style="margin-top: 10px">
+          ${strengthsHtml}
+        </ul>
+      </div>
+      <div class="insights-col">
+        <h4 class="insights-col-title weakness-title">Key Weaknesses</h4>
+        <ul class="insights-list" style="margin-top: 10px">
+          ${weaknessesHtml}
+        </ul>
+      </div>
+    </div>
+
+    <div class="insights-grid-layout" style="margin-top: 24px; border-top: 1px solid var(--border); padding-top: 24px;">
+      <div class="insights-col">
+        <h4 class="insights-col-title surface-title">Surface Analysis</h4>
+        <ul class="insights-list" style="margin-top: 10px">
+          ${surfaceHtml}
+        </ul>
+      </div>
+      <div class="insights-col">
+        <h4 class="insights-col-title form-title">Recent Form & Milestones</h4>
+        <ul class="insights-list" style="margin-top: 10px">
+          ${formHtml}
+        </ul>
+      </div>
+    </div>
+  `;
+}
+
+function getMockInsights(p) {
+  const strengths = [];
+  const weaknesses = [];
+  const playStyle = (p.aiInsights && p.aiInsights.tags) || ["All-Court"];
+  
+  if (p.serve?.acesPct?.value > 8) strengths.push("Strong server: high ace percentage.");
+  if (p.serve?.breakPointsSavedPct?.value > 65) strengths.push("Clutch performer: saves high percentage of break points.");
+  if (p.returnAnalytics?.returnGamesWon?.value > 28) strengths.push("Elite returner: breaks serve frequently.");
+  
+  if (p.serve?.doubleFaultsPct?.value > 5) weaknesses.push("Inconsistent serve: high double fault rate.");
+  if (p.returnAnalytics?.returnPointsWon?.value < 38) weaknesses.push("Vulnerable on return game.");
+  
+  if (strengths.length === 0) strengths.push("Solid baseline rally tolerance.");
+  if (weaknesses.length === 0) weaknesses.push("Can struggle in extremely fast conditions.");
+  
+  const surfaceInsights = [`Strongest surface is ${p.bestSurface} with high win rates.`];
+  const recentFormWins = Array.isArray(p.overview?.recentForm)
+    ? p.overview.recentForm.filter(f => f === "W").length
+    : 5;
+  const recentFormInsights = [
+    `Won ${recentFormWins} of the last 10 matches.`,
+    `Currently ranked #${p.overview.currentRank}.`
+  ];
+  
+  return {
+    strengths,
+    weaknesses,
+    playStyle,
+    surfaceInsights,
+    recentFormInsights
+  };
 }
 
 // ═══════════════════════════════════════

@@ -134,13 +134,20 @@ async function buildReport(a, b) {
   report.classList.remove("hidden");
 
   let data = null;
+  let matchupIntel = null;
   try {
-    const res = await fetch(`${API_BASE}/h2h?p1=${encodeURIComponent(a)}&p2=${encodeURIComponent(b)}`);
-    if (res.ok) {
-      data = await res.json();
+    const [h2hRes, matchupRes] = await Promise.all([
+      fetch(`${API_BASE}/h2h?p1=${encodeURIComponent(a)}&p2=${encodeURIComponent(b)}`),
+      fetch(`${API_BASE}/matchup/${encodeURIComponent(a)}/${encodeURIComponent(b)}`)
+    ]);
+    if (h2hRes.ok) {
+      data = await h2hRes.json();
+    }
+    if (matchupRes.ok) {
+      matchupIntel = await matchupRes.json();
     }
   } catch (err) {
-    console.warn("Failed to fetch H2H data from API, using fallback data", err);
+    console.warn("Failed to fetch API data from server, using fallback data", err);
   }
 
   let pa, pb, meetings, style, matchup, matchupKey;
@@ -162,6 +169,11 @@ async function buildReport(a, b) {
 
   if (!pa || !pb) return;
 
+  // Generate fallback matchup intelligence if missing/offline
+  if (!matchupIntel) {
+    matchupIntel = getMockMatchupIntelligence(pa, pb, matchup);
+  }
+
   // Determine which player is "a" in the data (alphabetical)
   const [dataA, dataB] = getDataOrder(a, b);
   const paIsDataA = (a === dataA);
@@ -171,7 +183,7 @@ async function buildReport(a, b) {
   renderHistory(pa, pb, meetings, paIsDataA);
   renderClash(pa, pb, style, paIsDataA);
   renderMatchup(pa, pb, matchup, paIsDataA);
-  renderPredict(pa, pb, matchup, paIsDataA);
+  renderPredictNew(pa, pb, matchupIntel);
   renderBetting(matchup);
   renderAISummary(pa, pb, matchup);
 
@@ -542,52 +554,129 @@ function renderMatchup(pa, pb, matchup, paIsDataA) {
 // ═══════════════════════════════════════
 // WIN PROBABILITY
 // ═══════════════════════════════════════
-function renderPredict(pa, pb, matchup, paIsDataA) {
-  const oa = pa.overview, ob = pb.overview;
-
-  if (!matchup) {
-    $("#predict-content").innerHTML = `<p style="text-align:center;color:var(--text-muted)">Prediction data unavailable.</p>`;
+function renderPredictNew(pa, pb, mi) {
+  const el = $("#predict-content");
+  if (!mi) {
+    el.innerHTML = `<p style="text-align:center;color:var(--text-muted)">Matchup prediction unavailable.</p>`;
     return;
   }
 
-  const winA = paIsDataA ? matchup.winProb.a : matchup.winProb.b;
-  const winB = paIsDataA ? matchup.winProb.b : matchup.winProb.a;
-  const reasonsA = paIsDataA ? matchup.reasons.a : matchup.reasons.b;
-  const reasonsB = paIsDataA ? matchup.reasons.b : matchup.reasons.a;
+  const confCls = mi.confidence.toLowerCase() === "high" ? "confidence-high" : mi.confidence.toLowerCase() === "medium" ? "confidence-medium" : "confidence-low";
+  
+  const advantagesHtml = mi.advantages.map(a => `
+    <li class="prob-reason" style="display:flex;align-items:flex-start;gap:8px;margin-bottom:10px;">
+      <span style="color:var(--green);font-weight:bold;margin-top:1px;">✓</span>
+      <span style="color:var(--text-secondary);font-size:0.88rem;">${a}</span>
+    </li>
+  `).join("");
 
-  const confCls = matchup.confidence === "High" ? "confidence-high" : matchup.confidence === "Medium" ? "confidence-medium" : "confidence-low";
+  const riskFactorsHtml = mi.riskFactors.map(rf => `
+    <li class="prob-reason" style="display:flex;align-items:flex-start;gap:8px;margin-bottom:10px;">
+      <span style="color:var(--red);font-weight:bold;margin-top:1px;">⚠</span>
+      <span style="color:var(--text-secondary);font-size:0.88rem;">${rf}</span>
+    </li>
+  `).join("");
 
-  const reasonsHtmlA = reasonsA.map(r => `<li class="prob-reason">${r}</li>`).join("");
-  const reasonsHtmlB = reasonsB.map(r => `<li class="prob-reason">${r}</li>`).join("");
+  // Determine progress bar fill percentages
+  const p1Name = pa.overview.name;
+  const p2Name = pb.overview.name;
+  
+  let fillPctL = 50;
+  let fillPctR = 50;
+  if (mi.favorite === p1Name) {
+    fillPctL = mi.winProbability;
+    fillPctR = 100 - mi.winProbability;
+  } else {
+    fillPctL = 100 - mi.winProbability;
+    fillPctR = mi.winProbability;
+  }
 
-  $("#predict-content").innerHTML = `
-      <div class="predict-confidence-row" style="margin-bottom:20px">
-        <span class="predict-confidence-badge ${confCls}">${matchup.confidence} Confidence Prediction</span>
-      </div>
-      <div class="predict-split reveal">
-        <div class="predict-player-col p1">
-          <div class="prob-pct p1c">${winA}%</div>
-          <div class="prob-label">Win Probability</div>
-          <div class="prob-bar-track">
-            <div class="prob-bar-fill" style="width:${winA}%"></div>
-          </div>
-          <div class="prob-reasons-title">${oa.name}'s Advantages</div>
-          <ul class="prob-reasons">${reasonsHtmlA}</ul>
+  el.innerHTML = `
+    <div class="mi-result-card reveal" style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-xl);padding:36px 32px;">
+      <!-- Confidence & Favorite Banner -->
+      <div class="mi-header-row" style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:18px;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
+        <div>
+          <span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:700;">Predicted Favorite</span>
+          <h3 style="font-size:1.6rem;font-weight:900;color:var(--text-primary);margin-top:4px;">🏆 ${mi.favorite}</h3>
         </div>
-        <div class="predict-center-col">VS</div>
-        <div class="predict-player-col p2">
-          <div class="prob-pct p2c">${winB}%</div>
-          <div class="prob-label">Win Probability</div>
-          <div class="prob-bar-track">
-            <div class="prob-bar-fill" style="width:${winB}%"></div>
-          </div>
-          <div class="prob-reasons-title">${ob.name}'s Advantages</div>
-          <ul class="prob-reasons">${reasonsHtmlB}</ul>
+        <div style="text-align:right">
+          <span class="predict-confidence-badge ${confCls}" style="padding:5px 16px;border-radius:var(--radius-full);font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;">${mi.confidence} Confidence</span>
+          <div class="prob-pct" style="font-size:2rem;font-weight:900;font-family:var(--font-mono);background:var(--gradient-hero);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-top:4px;">${mi.winProbability}%</div>
         </div>
       </div>
-    `;
+
+      <!-- Probability Bar -->
+      <div class="prob-bar-container" style="margin-bottom:32px;">
+        <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;font-weight:600;letter-spacing:0.04em;">
+          <span>${p1Name}</span>
+          <span>${p2Name}</span>
+        </div>
+        <div class="prob-bar-track" style="height:10px;background:rgba(255,255,255,0.05);border-radius:5px;position:relative;overflow:hidden;display:flex;">
+          <div class="prob-bar-fill-l" style="width:${fillPctL}%;height:100%;background:var(--accent);transition:width 1s var(--ease);"></div>
+          <div class="prob-bar-fill-r" style="width:${fillPctR}%;height:100%;background:var(--cyan);transition:width 1s var(--ease);"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:0.85rem;margin-top:6px;font-weight:700;">
+          <span class="p1c" style="color:var(--accent-hover);">${fillPctL}%</span>
+          <span class="p2c" style="color:var(--cyan);">${fillPctR}%</span>
+        </div>
+      </div>
+
+      <!-- Advantages vs Risk Factors Grid -->
+      <div class="mi-details-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-bottom:32px;">
+        <div>
+          <h4 style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--green);margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:6px;">Advantages for ${mi.favorite}</h4>
+          <ul style="list-style:none;padding:0;">
+            ${advantagesHtml}
+          </ul>
+        </div>
+        <div>
+          <h4 style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--red);margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:6px;">Risk Factors / Vulnerabilities</h4>
+          <ul style="list-style:none;padding:0;">
+            ${riskFactorsHtml}
+          </ul>
+        </div>
+      </div>
+
+      <!-- Reasoning & Key Battle -->
+      <div style="display:flex;flex-direction:column;gap:18px;">
+        <!-- Reasoning -->
+        <div class="predict-reasoning" style="margin:0;border-left:3px solid var(--accent);background:rgba(255,255,255,0.01);padding:18px 20px;border-radius:var(--radius-sm);">
+          <span style="display:block;font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:700;margin-bottom:6px;">AI Matchup Reasoning</span>
+          <p style="font-size:0.9rem;color:var(--text-secondary);line-height:1.65;text-align:left;margin:0;">${mi.reasoning}</p>
+        </div>
+
+        <!-- Key Battle -->
+        <div class="predict-reasoning" style="margin:0;border-left:3px solid var(--cyan);background:rgba(255,255,255,0.01);padding:18px 20px;border-radius:var(--radius-sm);">
+          <span style="display:block;font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:700;margin-bottom:6px;">🔑 Key Tactical Battle</span>
+          <p style="font-size:0.9rem;color:var(--text-secondary);line-height:1.65;text-align:left;margin:0;">${mi.keyBattle}</p>
+        </div>
+      </div>
+    </div>
+  `;
 
   refreshReveal();
+}
+
+function getMockMatchupIntelligence(pa, pb, matchup) {
+  const winA = matchup?.winProb?.a || 50;
+  const winB = matchup?.winProb?.b || 50;
+  const favorite = winA >= winB ? pa.overview.name : pb.overview.name;
+  const winProbability = Math.max(winA, winB);
+  const confidence = matchup?.confidence || "Medium";
+  const advantages = matchup?.reasons?.[winA >= winB ? "a" : "b"] || ["Overall statistical advantage."];
+  const riskFactors = matchup?.reasons?.[winA >= winB ? "b" : "a"]?.map(r => `Opponent holds advantage in: ${r}`) || ["Potential drop in baseline consistency."];
+  const keyBattle = `Baseline Consistency: Overall surface capability clash.`;
+  const reasoning = matchup?.aiSummary || `Matchup analysis between ${pa.overview.name} and ${pb.overview.name}.`;
+
+  return {
+    favorite,
+    winProbability,
+    confidence,
+    advantages,
+    reasoning,
+    riskFactors,
+    keyBattle
+  };
 }
 
 // ═══════════════════════════════════════

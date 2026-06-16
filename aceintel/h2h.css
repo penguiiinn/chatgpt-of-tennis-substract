@@ -869,3 +869,11 @@
   .clash-points { grid-template-columns: 1fr; }
   .h2h-record-banner { flex-direction: column; gap: 16px; }
 }
+
+/* Matchup Intelligence Extension */
+@media (max-width: 768px) {
+  .mi-details-grid {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
+  }
+}
