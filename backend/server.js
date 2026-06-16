@@ -13,6 +13,8 @@ const matchupRoutes = require("./routes/matchupRoutes");
 const { warmCache } = require("./scraper/searchScraper");
 const liveRoutes = require("./routes/liveRoutes");
 const profileRoutes = require("./routes/profileRoutes");
+// Step 6 — new prediction engine route (separate from legacy /api/predictions)
+const predictionEngineRoutes = require("./routes/predictionRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -37,6 +39,8 @@ app.use("/api/search", searchRoutes);
 app.use("/api/matchup", matchupRoutes);
 app.use("/api/live", liveRoutes);
 app.use("/api/profile", profileRoutes);
+// Step 6 — Prediction Engine (also accessible via existing /api/predictions/match)
+app.use("/api/prediction", predictionEngineRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {
