@@ -92,11 +92,19 @@
   }
 
   function highlightMatch(text, query) {
-    const idx = text.toLowerCase().indexOf(query.toLowerCase());
-    if (idx < 0) return text;
-    return text.slice(0, idx) +
-      `<span class="search-highlight">${text.slice(idx, idx + query.length)}</span>` +
-      text.slice(idx + query.length);
+    if (!query || !query.trim()) return text;
+    const parts = query.trim().split(/\s+/).filter(Boolean);
+    parts.sort((a, b) => b.length - a.length);
+
+    let highlightedText = text;
+    try {
+      const escapedParts = parts.map(p => p.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
+      const regex = new RegExp(`(${escapedParts.join("|")})`, "gi");
+      highlightedText = text.replace(regex, `<span class="search-highlight">$1</span>`);
+    } catch (e) {
+      console.warn("Highlighting regex failed", e);
+    }
+    return highlightedText;
   }
 
   function attachAutocompleteToInput({ input, dropdown, contextName }) {
@@ -155,9 +163,17 @@
       dropdown.innerHTML = "";
       activeIdx = -1;
 
-      if (data && data.length > 0) {
-        const query = input.value.trim();
-        dropdown.innerHTML = data.map((m) => {
+      const query = input.value.trim();
+      const queryLower = query.toLowerCase();
+      const queryParts = queryLower.split(/\s+/).filter(Boolean);
+      const filteredData = (data || []).filter(player => {
+        if (!player.name) return false;
+        const playerNameLower = player.name.toLowerCase();
+        return queryParts.every(part => playerNameLower.includes(part));
+      });
+
+      if (filteredData.length > 0) {
+        dropdown.innerHTML = filteredData.map((m) => {
           const slug = extractSlug(m.url);
           return `
             <div class="search-dropdown-item" data-name="${m.name}" data-slug="${slug}" data-tour="${m.tour}">
@@ -480,7 +496,6 @@
       renderCompare(p1, p2);
     });
   }
-
   function attachCompareAutocomplete(input) {
     const wrapper = input.parentElement;
     wrapper.style.position = "relative";
@@ -499,8 +514,17 @@
           const res = await fetch(`${API_BASE}/search?name=${encodeURIComponent(q)}&limit=8`);
           if (!res.ok) throw new Error();
           const results = await res.json();
-          if (!results.length) { dd.innerHTML = `<div class="search-dropdown-empty">No players found</div>`; dd.classList.add("open"); return; }
-          dd.innerHTML = results.map(p => `
+          
+          const queryLower = q.toLowerCase();
+          const queryParts = queryLower.split(/\s+/).filter(Boolean);
+          const filteredResults = results.filter(player => {
+            if (!player.name) return false;
+            const playerNameLower = player.name.toLowerCase();
+            return queryParts.every(part => playerNameLower.includes(part));
+          });
+
+          if (!filteredResults.length) { dd.innerHTML = `<div class="search-dropdown-empty">No players found</div>`; dd.classList.add("open"); return; }
+          dd.innerHTML = filteredResults.map(p => `
             <div class="search-dropdown-item" data-name="${p.name}">
               <div class="search-dropdown-avatar">${getInitials(p.name)}</div>
               <div class="search-dropdown-info">
@@ -542,8 +566,17 @@
       const keys = (playersList && playersList.length > 0)
         ? playersList.map(p => p.name)
         : Object.keys(PLAYERS_DB);
-      if (!m1) m1 = keys.find(k => k.toLowerCase().includes(q1.toLowerCase()));
-      if (!m2) m2 = keys.find(k => k.toLowerCase().includes(q2.toLowerCase()));
+      
+      const matchKey = (q) => {
+        const qParts = q.toLowerCase().split(/\s+/).filter(Boolean);
+        return keys.find(k => {
+          const kLower = k.toLowerCase();
+          return qParts.every(part => kLower.includes(part));
+        });
+      };
+
+      if (!m1) m1 = matchKey(q1);
+      if (!m2) m2 = matchKey(q2);
     }
 
     if (!m1 || !m2) {
