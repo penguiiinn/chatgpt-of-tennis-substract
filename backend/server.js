@@ -32,7 +32,7 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "OK", timestamp: new Date(), service: "AceIntel API" });
 });
 
-// Connect Routes
+// Connect Routes (must be registered before any potential fallback routes)
 app.use("/api/players", playerRoutes);
 app.use("/api/player", playerDetailRoutes);
 app.use("/api/surfaces", surfaceRoutes);
@@ -49,6 +49,7 @@ app.use("/api/prediction", predictionEngineRoutes);
 app.use("/api/betting", bettingRoutes);
 // Step 8 — Tournament Mode
 app.use("/api/tournament", tournamentRoutes);
+
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {
