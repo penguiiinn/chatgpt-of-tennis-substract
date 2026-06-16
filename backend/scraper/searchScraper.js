@@ -9,7 +9,61 @@ let playerCache = [];
 let lastCacheTime = 0;
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
-const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+// ── Browser-realistic headers ────────────────────────────────────────────────
+// Rotate through multiple UAs to avoid bot detection on cloud hosts (Render etc.)
+const USER_AGENTS = [
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
+];
+
+function randomUA() {
+  return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+}
+
+function buildHeaders() {
+  return {
+    "User-Agent": randomUA(),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache",
+    "Upgrade-Insecure-Requests": "1",
+    "Referer": "https://www.tennisabstract.com/",
+  };
+}
+
+/**
+ * Fetch a URL with automatic retry on failure.
+ * @param {string} url
+ * @param {number} retries
+ * @returns {Promise<AxiosResponse>}
+ */
+async function fetchWithRetry(url, retries = 3) {
+  let lastErr;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const res = await axios.get(url, {
+        headers: buildHeaders(),
+        timeout: 20000,
+        maxRedirects: 5,
+      });
+      return res;
+    } catch (err) {
+      lastErr = err;
+      const status = err?.response?.status;
+      console.warn(`[SearchScraper] Attempt ${attempt}/${retries} failed for ${url}: ${err.message} (HTTP ${status || "N/A"})`);
+      if (attempt < retries) {
+        // Exponential backoff: 1s, 2s, 4s
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
+      }
+    }
+  }
+  throw lastErr;
+}
 
 /**
  * Scrape a Tennis Abstract Elo ratings page and extract all player links.
@@ -20,10 +74,14 @@ const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 async function scrapeEloPage(url, tour) {
   try {
     console.log(`[SearchScraper] Fetching ${tour} player list from ${url}`);
-    const res = await axios.get(url, {
-      headers: { "User-Agent": UA },
-      timeout: 15000,
-    });
+    const res = await fetchWithRetry(url);
+
+    // Detect blocked / empty responses (some hosts serve a 200 with empty/error HTML)
+    const bodyLen = (res.data || "").length;
+    if (bodyLen < 500) {
+      console.warn(`[SearchScraper] ${tour} page returned suspiciously short body (${bodyLen} bytes) — likely blocked.`);
+      return [];
+    }
 
     const $ = cheerio.load(res.data);
     const players = [];
@@ -63,6 +121,7 @@ async function scrapeEloPage(url, tour) {
 
 /**
  * Build (or refresh) the full player cache from both tours.
+ * Preserves a stale cache if both scrapes fail, to avoid going fully dark.
  */
 async function refreshCache() {
   const now = Date.now();
@@ -84,13 +143,17 @@ async function refreshCache() {
     lastCacheTime = Date.now();
     console.log(`[SearchScraper] Cache populated with ${playerCache.length} players`);
   } else {
-    // If cache is empty, do not keep a stale empty dataset.
-    console.warn("[SearchScraper] Both scrapes returned empty. Player cache will remain empty.");
-    playerCache = [];
-    lastCacheTime = Date.now();
+    // Keep the stale cache rather than wiping it — better to serve old data than nothing.
+    if (playerCache.length > 0) {
+      console.warn("[SearchScraper] Scrape failed — keeping stale cache of " + playerCache.length + " players.");
+      // Reset lastCacheTime so we retry on next request (don't serve stale data forever)
+      lastCacheTime = now - CACHE_TTL_MS + 60_000; // retry in 1 minute
+    } else {
+      console.error("[SearchScraper] Scrape failed and cache is empty. Search will return no results.");
+      lastCacheTime = now; // avoid tight retry loop
+    }
   }
 }
-
 
 /**
  * Search for players whose name matches the query (case-insensitive substring).
@@ -103,27 +166,19 @@ async function searchPlayers(query, limit = 20) {
 
   if (!query || !query.trim()) return [];
 
-  // If cache is still empty (e.g., scrape failed or blocked), try one more time.
+  // If cache is still empty after refresh, log a clear diagnostic and return empty
   if (!playerCache || playerCache.length === 0) {
-    console.warn("[SearchScraper] Player cache empty after refresh. Attempting one more refresh.");
-    await refreshCache();
-  }
-
-  if (!playerCache || playerCache.length === 0) {
-    console.warn("[SearchScraper] Player cache remains empty; returning no results.");
+    console.error("[SearchScraper] Player cache is empty — Tennis Abstract may be blocking requests from this host.");
     return [];
   }
 
   const q = query.trim().toLowerCase();
-
-  console.log(`[SearchScraper] Incoming query: "${query}" (normalized: "${q}")`);
-
+  console.log(`[SearchScraper] Searching for: "${query}" in ${playerCache.length} cached players`);
 
   // Score-based ranking: exact match > starts-with > includes
   const resultsWithScore = playerCache
     .map(p => {
       const lower = p.name.toLowerCase();
-
       let score = 0;
       if (lower === q) score = 100;
       else if (lower.startsWith(q)) score = 80;
@@ -137,7 +192,6 @@ async function searchPlayers(query, limit = 20) {
         ).length;
         if (matchCount > 0) score = 40 + matchCount * 10;
       }
-
       return { ...p, score };
     })
     .filter(p => p.score > 0);
@@ -147,9 +201,8 @@ async function searchPlayers(query, limit = 20) {
     .slice(0, limit)
     .map(({ score, ...rest }) => rest); // strip internal score
 
-  console.log(`[SearchScraper] Matched players: ${results.length}`);
+  console.log(`[SearchScraper] Matched ${results.length} players for query "${query}"`);
   return results;
-
 }
 
 /**
@@ -161,9 +214,34 @@ function warmCache() {
   });
 }
 
+/**
+ * Return a cache status snapshot (used by /api/search/status diagnostic endpoint).
+ */
+function getCacheStatus() {
+  return {
+    playerCount: playerCache.length,
+    lastRefreshedAt: lastCacheTime ? new Date(lastCacheTime).toISOString() : null,
+    cacheAgeSeconds: lastCacheTime ? Math.round((Date.now() - lastCacheTime) / 1000) : null,
+    cacheTtlSeconds: CACHE_TTL_MS / 1000,
+    isStale: lastCacheTime ? (Date.now() - lastCacheTime) > CACHE_TTL_MS : true,
+  };
+}
+
+/**
+ * Force an immediate cache re-scrape regardless of TTL.
+ * Used by the /api/search/refresh admin endpoint.
+ */
+async function forceRefresh() {
+  lastCacheTime = 0; // expire the cache
+  await refreshCache();
+}
+
 module.exports = {
   searchPlayers,
   refreshCache,
+  forceRefresh,
   warmCache,
   getPlayerCache: () => playerCache,
+  getCacheStatus,
 };
+

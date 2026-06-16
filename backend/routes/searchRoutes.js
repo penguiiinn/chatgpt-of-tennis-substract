@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { searchPlayers } = require("../scraper/searchScraper");
+const { searchPlayers, refreshCache, getCacheStatus } = require("../scraper/searchScraper");
 
 /**
  * GET /api/search?name=<query>&limit=<n>
@@ -23,6 +23,37 @@ router.get("/", async (req, res, next) => {
     const results = await searchPlayers(name, maxResults);
 
     res.json(results);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/search/status
+ * Diagnostic: shows cache health (player count, last refresh time, staleness).
+ * Useful for debugging empty search results on deployed instances.
+ */
+router.get("/status", (req, res) => {
+  res.json(getCacheStatus());
+});
+
+/**
+ * POST /api/search/refresh
+ * Force a manual cache refresh without redeploying.
+ * Useful when Render cold-starts fail to warm the cache.
+ */
+router.post("/refresh", async (req, res, next) => {
+  try {
+    // Force expiry so refreshCache() actually re-fetches
+    const { forceRefresh } = require("../scraper/searchScraper");
+    if (typeof forceRefresh === "function") {
+      await forceRefresh();
+    } else {
+      // Workaround: call refreshCache — it will skip if TTL hasn't expired,
+      // so we expose a dedicated forceRefresh below
+      await refreshCache();
+    }
+    res.json({ ok: true, status: getCacheStatus() });
   } catch (err) {
     next(err);
   }
