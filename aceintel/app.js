@@ -103,6 +103,13 @@
     let debounceTimer = null;
     let activeIdx = -1;
 
+    // Used to ignore out-of-order async responses.
+    if (typeof attachAutocompleteToInput.__reqIdCounter === "undefined") {
+      attachAutocompleteToInput.__reqIdCounter = 0;
+      attachAutocompleteToInput.__lastReqId = 0;
+    }
+
+
     const showLoading = () => {
       dropdown.classList.add("open");
       dropdown.innerHTML = `
@@ -154,6 +161,7 @@
         return;
       }
 
+      const reqId = ++attachAutocompleteToInput.__reqIdCounter;
       debounceTimer = setTimeout(async () => {
         showLoading();
         try {
@@ -161,11 +169,15 @@
           if (!res.ok) throw new Error("Search API error");
           const results = await res.json();
 
+          // Ignore stale responses from older keystrokes
+          if (reqId !== attachAutocompleteToInput.__lastReqId) return;
+
           if (!results.length) {
             dropdown.innerHTML = `<div class="search-dropdown-empty">No players found for "${query}"</div>`;
             dropdown.classList.add("open");
             return;
           }
+
 
           activeIdx = -1;
           dropdown.innerHTML = results.map((m) => {
