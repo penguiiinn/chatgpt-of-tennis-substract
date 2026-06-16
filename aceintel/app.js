@@ -17,28 +17,26 @@
   // ─── Init ───────────────────────────────
   document.addEventListener("DOMContentLoaded", () => {
     initNav();
-    initSearch();
+    initGlobalPlayerSearch();
     initChips();
     renderTrending();
     initCompare();
     loadPlayerData(currentPlayer);
     initScrollReveal();
     initSmoothScroll();
-    
-    // Fetch players in the background
-    fetchPlayersList().catch(() => {});
   });
 
   async function fetchPlayersList() {
+    // deprecated: homepage autocomplete is selection-only via the Tennis Abstract search API.
+    // keep function to avoid breaking other page logic if referenced elsewhere.
     try {
       const res = await fetch(`${API_BASE}/players`);
-      if (res.ok) {
-        playersList = await res.json();
-      }
+      if (res.ok) playersList = await res.json();
     } catch (err) {
-      console.warn("Failed to fetch players list from API, using static fallback.", err);
+      console.warn("Failed to fetch players list from API.", err);
     }
   }
+
 
   // ═══════════════════════════════════════
   // NAVBAR
@@ -81,144 +79,16 @@
   }
 
   // ═══════════════════════════════════════
-  // SEARCH (Dynamic – Tennis Abstract)
+  // SEARCH — Global live autocomplete (Homepage + Navbar)
   // ═══════════════════════════════════════
-  let searchTimeout = null;
-  let activeDropdownIdx = -1;
-
-  function initSearch() {
-    const input = $("#hero-search");
-    const btn = $("#btn-analyze");
-    const searchBox = $("#hero-search-box");
-
-    // Create dropdown container
-    const dropdown = document.createElement("div");
-    dropdown.className = "search-dropdown";
-    dropdown.id = "search-dropdown";
-    searchBox.style.position = "relative";
-    searchBox.appendChild(dropdown);
-
-    btn.addEventListener("click", () => {
-      const query = input.value.trim();
-      if (query) searchPlayer(query);
-    });
-
-    input.addEventListener("keydown", (e) => {
-      const items = dropdown.querySelectorAll(".search-dropdown-item");
-      if (e.key === "Enter") {
-        e.preventDefault();
-        if (activeDropdownIdx >= 0 && items[activeDropdownIdx]) {
-          items[activeDropdownIdx].click();
-        } else {
-          const query = input.value.trim();
-          if (query) searchPlayer(query);
-        }
-        return;
-      }
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        activeDropdownIdx = Math.min(activeDropdownIdx + 1, items.length - 1);
-        updateDropdownHighlight(items);
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        activeDropdownIdx = Math.max(activeDropdownIdx - 1, -1);
-        updateDropdownHighlight(items);
-      }
-      if (e.key === "Escape") {
-        dropdown.classList.remove("open");
-        activeDropdownIdx = -1;
-      }
-    });
-
-    input.addEventListener("input", () => {
-      const query = input.value.trim();
-      if (searchTimeout) clearTimeout(searchTimeout);
-      if (query.length < 2) {
-        dropdown.classList.remove("open");
-        dropdown.innerHTML = "";
-        return;
-      }
-      searchTimeout = setTimeout(() => fetchSearchResults(query, dropdown), 250);
-    });
-
-    // Close dropdown when clicking outside
-    document.addEventListener("click", (e) => {
-      if (!searchBox.contains(e.target)) {
-        dropdown.classList.remove("open");
-        activeDropdownIdx = -1;
-      }
-    });
-  }
-
-  async function fetchSearchResults(query, dropdown) {
+  function extractSlug(url) {
+    if (!url) return "";
     try {
-      const res = await fetch(`${API_BASE}/search?name=${encodeURIComponent(query)}&limit=10`);
-      if (!res.ok) throw new Error("Search API error");
-      const results = await res.json();
-
-      if (results.length === 0) {
-        dropdown.innerHTML = `<div class="search-dropdown-empty">No players found for "${query}"</div>`;
-        dropdown.classList.add("open");
-        return;
-      }
-
-      activeDropdownIdx = -1;
-      dropdown.innerHTML = results.map((p, i) => `
-        <div class="search-dropdown-item" data-name="${p.name}" data-url="${p.url}" data-tour="${p.tour}">
-          <div class="search-dropdown-avatar">${getInitials(p.name)}</div>
-          <div class="search-dropdown-info">
-            <div class="search-dropdown-name">${highlightMatch(p.name, query)}</div>
-            <div class="search-dropdown-tour">${p.tour}</div>
-          </div>
-        </div>
-      `).join("");
-
-      dropdown.querySelectorAll(".search-dropdown-item").forEach(item => {
-        item.addEventListener("click", () => {
-          const name = item.dataset.name;
-          $("#hero-search").value = name;
-          dropdown.classList.remove("open");
-          window.location.href = `player.html?player=${encodeURIComponent(name)}`;
-        });
-      });
-
-      dropdown.classList.add("open");
-    } catch (err) {
-      console.warn("Live search failed, falling back to static:", err);
-      // Fallback to static search
-      fallbackStaticDropdown(query, dropdown);
+      const urlObj = new URL(url, "https://www.tennisabstract.com");
+      return urlObj.searchParams.get("p") || "";
+    } catch {
+      return "";
     }
-  }
-
-  function fallbackStaticDropdown(query, dropdown) {
-    const keys = (playersList && playersList.length > 0)
-      ? playersList.map(p => p.name)
-      : Object.keys(PLAYERS_DB);
-    const matches = keys.filter(k => k.toLowerCase().includes(query.toLowerCase())).slice(0, 10);
-
-    if (matches.length === 0) {
-      dropdown.innerHTML = `<div class="search-dropdown-empty">No players found</div>`;
-    } else {
-      dropdown.innerHTML = matches.map(name => `
-        <div class="search-dropdown-item" data-name="${name}">
-          <div class="search-dropdown-avatar">${getInitials(name)}</div>
-          <div class="search-dropdown-info">
-            <div class="search-dropdown-name">${highlightMatch(name, query)}</div>
-            <div class="search-dropdown-tour">Local</div>
-          </div>
-        </div>
-      `).join("");
-      dropdown.querySelectorAll(".search-dropdown-item").forEach(item => {
-        item.addEventListener("click", () => {
-          const name = item.dataset.name;
-          $("#hero-search").value = name;
-          dropdown.classList.remove("open");
-          window.location.href = `player.html?player=${encodeURIComponent(name)}`;
-        });
-      });
-    }
-    dropdown.classList.add("open");
   }
 
   function highlightMatch(text, query) {
@@ -229,19 +99,249 @@
       text.slice(idx + query.length);
   }
 
-  function updateDropdownHighlight(items) {
-    items.forEach((it, i) => {
-      it.classList.toggle("highlighted", i === activeDropdownIdx);
+  function attachAutocompleteToInput({ input, dropdown, contextName }) {
+    let debounceTimer = null;
+    let activeIdx = -1;
+
+    const showLoading = () => {
+      dropdown.classList.add("open");
+      dropdown.innerHTML = `
+        <div style="padding:12px 16px;color:var(--text-muted);font-size:0.85rem;display:flex;align-items:center;gap:10px">
+          <span class="spinner" style="width:12px;height:12px;border-radius:50%;border:2px solid rgba(255,255,255,0.25);border-top-color:var(--accent);display:inline-block;animation:spin .7s linear infinite"></span>
+          Searching…
+        </div>
+      `;
+    };
+
+    const clearDropdown = () => {
+      dropdown.classList.remove("open");
+      dropdown.innerHTML = "";
+      activeIdx = -1;
+    };
+
+    const setSelection = (itemEl) => {
+      const pickedName = itemEl.getAttribute("data-name") || "";
+      const pickedSlug = itemEl.getAttribute("data-slug") || "";
+
+      if (!pickedSlug) {
+        showToast("Could not resolve selected player.");
+        return;
+      }
+
+      input.value = pickedName;
+      input.dataset.slug = pickedSlug;
+      input.dataset.name = pickedName;
+
+      dropdown.classList.remove("open");
+      dropdown.innerHTML = "";
+      activeIdx = -1;
+
+      // Hide dropdown after selection (requirement)
+      // Redirect to player route
+      window.location.href = `player.html?player=${encodeURIComponent(pickedSlug)}`;
+    };
+
+    input.addEventListener("input", () => {
+      // Prevent invalid manual submit after typing
+      delete input.dataset.slug;
+      delete input.dataset.name;
+
+      const query = input.value.trim();
+      if (debounceTimer) clearTimeout(debounceTimer);
+
+      if (query.length < 2) {
+        clearDropdown();
+        return;
+      }
+
+      debounceTimer = setTimeout(async () => {
+        showLoading();
+        try {
+          const res = await fetch(`${API_BASE}/search?name=${encodeURIComponent(query)}&limit=10`);
+          if (!res.ok) throw new Error("Search API error");
+          const results = await res.json();
+
+          if (!results.length) {
+            dropdown.innerHTML = `<div class="search-dropdown-empty">No players found for "${query}"</div>`;
+            dropdown.classList.add("open");
+            return;
+          }
+
+          activeIdx = -1;
+          dropdown.innerHTML = results.map((m) => {
+            const slug = extractSlug(m.url);
+            const tourBadgeClass = (m.tour || "").toLowerCase() === "atp" ? "atp" : "wta";
+            const tourLabel = (m.tour || "").toUpperCase();
+            return `
+              <div class="search-dropdown-item" data-name="${m.name}" data-slug="${slug}" data-tour="${m.tour}">
+                <div class="search-dropdown-avatar">${getInitials(m.name)}</div>
+                <div class="search-dropdown-info">
+                  <div class="search-dropdown-name">${highlightMatch(m.name, query)}</div>
+                  <div class="search-dropdown-tour">${tourLabel}</div>
+                </div>
+              </div>
+            `;
+          }).join("");
+
+          dropdown.querySelectorAll(".search-dropdown-item").forEach((item, idx) => {
+            item.addEventListener("click", () => setSelection(item));
+            item.addEventListener("mouseenter", () => {
+              activeIdx = idx;
+              const items = dropdown.querySelectorAll(".search-dropdown-item");
+              items.forEach((it, i) => it.classList.toggle("highlighted", i === activeIdx));
+            });
+          });
+
+          dropdown.classList.add("open");
+
+          // Keyboard navigation
+          const items = dropdown.querySelectorAll(".search-dropdown-item");
+          items.forEach((it, idx) => it.classList.toggle("highlighted", idx === activeIdx));
+        } catch (err) {
+          console.warn(`Global search failed (${contextName}):`, err);
+          dropdown.innerHTML = `<div class="search-dropdown-empty">Search failed</div>`;
+          dropdown.classList.add("open");
+        }
+      }, 300);
     });
-    if (activeDropdownIdx >= 0 && items[activeDropdownIdx]) {
-      items[activeDropdownIdx].scrollIntoView({ block: "nearest" });
+
+    input.addEventListener("keydown", (e) => {
+      const items = dropdown.querySelectorAll(".search-dropdown-item");
+      if (e.key === "Enter") {
+        if (input.dataset.slug) {
+          // If a selection was made, redirect
+          window.location.href = `player.html?player=${encodeURIComponent(input.dataset.slug)}`;
+        } else {
+          e.preventDefault();
+          showToast("Select a player from the suggestions.");
+        }
+        return;
+      }
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        activeIdx = Math.min(activeIdx + 1, items.length - 1);
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        activeIdx = Math.max(activeIdx - 1, -1);
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        clearDropdown();
+      }
+
+      items.forEach((it, i) => it.classList.toggle("highlighted", i === activeIdx));
+      if (activeIdx >= 0 && items[activeIdx]) {
+        items[activeIdx].scrollIntoView({ block: "nearest" });
+      }
+    });
+
+    document.addEventListener("click", (e) => {
+      // click-away close
+      if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+        clearDropdown();
+      }
+    });
+
+    input.addEventListener("focus", () => {
+      // Only show dropdown if we already have content
+      if (input.value.trim().length >= 2 && dropdown.innerHTML.trim()) {
+        dropdown.classList.add("open");
+      }
+    });
+  }
+
+  function initGlobalPlayerSearch() {
+    // Hero input
+    const heroInput = $("#hero-search");
+    const heroBtn = $("#btn-analyze");
+    const heroBox = $("#hero-search-box");
+    if (heroInput && heroBox) {
+      // dropdown container
+      const heroDropdown = document.createElement("div");
+      heroDropdown.className = "search-dropdown";
+      heroBox.style.position = "relative";
+      heroBox.appendChild(heroDropdown);
+
+      attachAutocompleteToInput({ input: heroInput, dropdown: heroDropdown, contextName: "hero" });
+
+      // Prevent invalid manual submit without selecting suggestion
+      heroBtn.addEventListener("click", (e) => {
+        const slug = heroInput.dataset.slug;
+        if (!slug) {
+          e.preventDefault();
+          showToast("Select a player from the suggestions.");
+          return;
+        }
+        window.location.href = `player.html?player=${encodeURIComponent(slug)}`;
+      });
+    }
+
+    // Navbar search (create if not present)
+    const navBar = $("#navbar");
+    if (navBar) {
+      // create minimal search UI if missing
+      let navSearchWrap = navBar.querySelector(".nav-search");
+      if (!navSearchWrap) {
+        navSearchWrap = document.createElement("div");
+        navSearchWrap.className = "nav-search";
+        navSearchWrap.style.display = "flex";
+        navSearchWrap.style.alignItems = "center";
+        navSearchWrap.style.gap = "8px";
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "nav-search-input";
+        input.id = "nav-search";
+        input.placeholder = "Search…";
+        input.autocomplete = "off";
+        input.style.background = "rgba(255,255,255,0.05)";
+        input.style.border = "1px solid var(--border)";
+        input.style.borderRadius = "999px";
+        input.style.padding = "8px 12px";
+        input.style.color = "var(--text-primary)";
+        input.style.outline = "none";
+
+        const dropdown = document.createElement("div");
+        dropdown.className = "search-dropdown";
+        dropdown.style.position = "absolute";
+        dropdown.style.marginTop = "6px";
+        dropdown.style.minWidth = "260px";
+
+        // wrap position for dropdown
+        navSearchWrap.style.position = "relative";
+        navSearchWrap.appendChild(input);
+        navSearchWrap.appendChild(dropdown);
+
+        const links = navBar.querySelector("#nav-links");
+        navBar.querySelector(".nav-inner").insertBefore(navSearchWrap, links);
+
+        // tweak input focus outline via inline style using var theme
+        input.addEventListener("focus", () => {
+          input.style.boxShadow = "var(--shadow-input)";
+          input.style.borderColor = "var(--accent)";
+        });
+        input.addEventListener("blur", () => {
+          input.style.boxShadow = "none";
+          input.style.borderColor = "var(--border)";
+        });
+
+        attachAutocompleteToInput({ input, dropdown, contextName: "navbar" });
+      } else {
+        const input = navSearchWrap.querySelector("#nav-search");
+        const dropdown = navSearchWrap.querySelector(".search-dropdown");
+        if (input && dropdown) {
+          attachAutocompleteToInput({ input, dropdown, contextName: "navbar" });
+        }
+      }
     }
   }
 
   function searchPlayer(query) {
-    // Navigate directly — the player page will handle resolution
+    // deprecated: selection-only navigation is enforced in the autocomplete inputs
     window.location.href = `player.html?player=${encodeURIComponent(query)}`;
   }
+
 
   // ═══════════════════════════════════════
   // CHIPS
@@ -261,7 +361,7 @@
   // ═══════════════════════════════════════
   async function renderTrending() {
     const grid = $("#trending-grid");
-    
+
     // Render static fallback immediately
     renderTrendingUI(TRENDING_PLAYERS);
 
@@ -450,12 +550,12 @@
     result.classList.remove("hidden");
 
     const compareStats = [
-      { label: "Serve Rating",     v1: p1.stats.serve,    v2: p2.stats.serve },
-      { label: "Return Rating",    v1: p1.stats.return,   v2: p2.stats.return },
-      { label: "Elo Rating",       v1: p1.stats.elo,      v2: p2.stats.elo,     isElo: true },
-      { label: "Pressure",         v1: p1.stats.pressure, v2: p2.stats.pressure },
-      { label: "Tiebreak",         v1: p1.stats.tiebreak, v2: p2.stats.tiebreak },
-      { label: "Break Point Conv.", v1: p1.stats.breakPt,  v2: p2.stats.breakPt  },
+      { label: "Serve Rating", v1: p1.stats.serve, v2: p2.stats.serve },
+      { label: "Return Rating", v1: p1.stats.return, v2: p2.stats.return },
+      { label: "Elo Rating", v1: p1.stats.elo, v2: p2.stats.elo, isElo: true },
+      { label: "Pressure", v1: p1.stats.pressure, v2: p2.stats.pressure },
+      { label: "Tiebreak", v1: p1.stats.tiebreak, v2: p2.stats.tiebreak },
+      { label: "Break Point Conv.", v1: p1.stats.breakPt, v2: p2.stats.breakPt },
     ];
 
     result.innerHTML = `
@@ -477,10 +577,10 @@
       </div>
       <div class="compare-bars">
         ${compareStats.map((s) => {
-          const max = s.isElo ? Math.max(s.v1, s.v2) * 1.05 : 100;
-          const pct1 = (s.v1 / max) * 50;
-          const pct2 = (s.v2 / max) * 50;
-          return `
+      const max = s.isElo ? Math.max(s.v1, s.v2) * 1.05 : 100;
+      const pct1 = (s.v1 / max) * 50;
+      const pct2 = (s.v2 / max) * 50;
+      return `
             <div class="compare-bar-row">
               <div class="compare-bar-label">${s.label}</div>
               <div class="compare-bar-track">
@@ -493,7 +593,7 @@
               </div>
             </div>
           `;
-        }).join("")}
+    }).join("")}
       </div>
       <div class="compare-h2h-link" style="text-align:center;margin-top:32px;">
         <a href="h2h.html?p1=${encodeURIComponent(p1.name)}&p2=${encodeURIComponent(p2.name)}" class="btn btn-primary">
@@ -526,8 +626,8 @@
           rank: d.overview.currentRank,
           surfaces: {
             grass: { winPct: d.surfaces.grass.winPct, rating: d.surfaces.grass.serveRating, strength: d.surfaces.grass.strength },
-            clay:  { winPct: d.surfaces.clay.winPct, rating: d.surfaces.clay.serveRating, strength: d.surfaces.clay.strength },
-            hard:  { winPct: d.surfaces.hard.winPct, rating: d.surfaces.hard.serveRating, strength: d.surfaces.hard.strength },
+            clay: { winPct: d.surfaces.clay.winPct, rating: d.surfaces.clay.serveRating, strength: d.surfaces.clay.strength },
+            hard: { winPct: d.surfaces.hard.winPct, rating: d.surfaces.hard.serveRating, strength: d.surfaces.hard.strength },
           },
           stats: {
             serve: d.strengthMeter.serve,
@@ -596,9 +696,9 @@
   function renderSurfaces(p) {
     const grid = $("#surface-grid");
     const surfaceData = [
-      { key: "grass", label: "Grass",     icon: "🌿", gradient: "grass" },
-      { key: "clay",  label: "Clay",      icon: "🧱", gradient: "clay" },
-      { key: "hard",  label: "Hard Court", icon: "🏟️", gradient: "hard" },
+      { key: "grass", label: "Grass", icon: "🌿", gradient: "grass" },
+      { key: "clay", label: "Clay", icon: "🧱", gradient: "clay" },
+      { key: "hard", label: "Hard Court", icon: "🏟️", gradient: "hard" },
     ];
 
     grid.innerHTML = surfaceData.map((s, i) => {
@@ -642,12 +742,12 @@
   function renderStats(p) {
     const grid = $("#stats-grid");
     const statsData = [
-      { label: "Serve Rating",       value: p.stats.serve,    emoji: "🎯", sub: "Power & placement" },
-      { label: "Return Rating",      value: p.stats.return,   emoji: "🛡️", sub: "Defensive brilliance" },
-      { label: "Elo Rating",         value: p.stats.elo,      emoji: "📈", sub: "Overall strength", isElo: true },
-      { label: "Pressure Perf.",     value: p.stats.pressure, emoji: "🧠", sub: "Mental fortitude" },
-      { label: "Tiebreak Perf.",     value: p.stats.tiebreak, emoji: "⚡", sub: "Clutch moments" },
-      { label: "Break Pt Conv.",     value: p.stats.breakPt,  emoji: "💥", sub: "Converting chances" },
+      { label: "Serve Rating", value: p.stats.serve, emoji: "🎯", sub: "Power & placement" },
+      { label: "Return Rating", value: p.stats.return, emoji: "🛡️", sub: "Defensive brilliance" },
+      { label: "Elo Rating", value: p.stats.elo, emoji: "📈", sub: "Overall strength", isElo: true },
+      { label: "Pressure Perf.", value: p.stats.pressure, emoji: "🧠", sub: "Mental fortitude" },
+      { label: "Tiebreak Perf.", value: p.stats.tiebreak, emoji: "⚡", sub: "Clutch moments" },
+      { label: "Break Pt Conv.", value: p.stats.breakPt, emoji: "💥", sub: "Converting chances" },
     ];
 
     grid.innerHTML = statsData.map((s, i) => {
@@ -735,10 +835,10 @@
       </div>
       <div class="h2h-bars">
         ${Object.entries(h.stats).map(([label, vals]) => {
-          const total = vals.p1 + vals.p2;
-          const pct1 = (vals.p1 / total) * 100;
-          const pct2 = (vals.p2 / total) * 100;
-          return `
+      const total = vals.p1 + vals.p2;
+      const pct1 = (vals.p1 / total) * 100;
+      const pct2 = (vals.p2 / total) * 100;
+      return `
             <div class="h2h-bar-row">
               <div class="h2h-bar-val">${vals.p1}</div>
               <div class="h2h-bar-center">
@@ -751,7 +851,7 @@
               <div class="h2h-bar-val">${vals.p2}</div>
             </div>
           `;
-        }).join("")}
+    }).join("")}
       </div>
       <div class="h2h-deep-link" style="text-align:center;margin-top:32px;">
         <a href="h2h.html?p1=${encodeURIComponent(p.name)}&p2=${encodeURIComponent(h.opponent)}" class="btn btn-primary">

@@ -51,18 +51,16 @@
 
       <div class="h2h-selector-card">
         <div class="h2h-selector-row">
-          <div class="h2h-select-group">
+          <div class="h2h-select-group search-container">
             <label class="h2h-select-label">Player 1</label>
-            <select id="sel-p1" class="h2h-select">
-              <option value="">Choose player…</option>
-            </select>
+            <input type="text" id="input-p1" class="h2h-select h2h-search-input" placeholder="Type player name..." autocomplete="off" />
+            <div id="results-p1" class="search-results-dropdown hidden"></div>
           </div>
           <div class="h2h-vs-badge">VS</div>
-          <div class="h2h-select-group">
+          <div class="h2h-select-group search-container">
             <label class="h2h-select-label">Player 2</label>
-            <select id="sel-p2" class="h2h-select">
-              <option value="">Choose player…</option>
-            </select>
+            <input type="text" id="input-p2" class="h2h-select h2h-search-input" placeholder="Type player name..." autocomplete="off" />
+            <div id="results-p2" class="search-results-dropdown hidden"></div>
           </div>
         </div>
         <button class="btn btn-primary btn-lg" id="btn-compare" style="width:100%;justify-content:center;margin-top:24px">

@@ -19,10 +19,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await fetchPlayersList();
 
   // Resolve player key
-  currentPlayerKey = resolvePlayerKey(playerParam);
-  if (!currentPlayerKey) {
-    currentPlayerKey = "Anna Blinkova";
-  }
+  currentPlayerKey = resolvePlayerKey(playerParam) || playerParam;
 
   loadProfile(currentPlayerKey);
   initNav();
