@@ -148,6 +148,9 @@
       window.location.href = `player.html?player=${encodeURIComponent(pickedSlug)}`;
     };
 
+    // Track abort controller per input instance to cancel old requests
+    let abortController = null;
+
     input.addEventListener("input", () => {
       // Prevent invalid manual submit after typing
       delete input.dataset.slug;
@@ -158,61 +161,78 @@
 
       if (query.length < 2) {
         clearDropdown();
+        if (abortController) abortController.abort();
         return;
       }
+
+      // Cancel in-flight request immediately when user types again
+      if (abortController) abortController.abort();
+      abortController = new AbortController();
+      const signal = abortController.signal;
 
       const reqId = ++attachAutocompleteToInput.__reqIdCounter;
       debounceTimer = setTimeout(async () => {
         showLoading();
         try {
-          const res = await fetch(`${API_BASE}/search?name=${encodeURIComponent(query)}&limit=10`);
+          const res = await fetch(
+            `${API_BASE}/search?name=${encodeURIComponent(query)}&limit=10`,
+            { signal }
+          );
           if (!res.ok) throw new Error("Search API error");
-          const results = await res.json();
+          const data = await res.json();
+
+          // Expose returned data for debugging (requested)
+          console.log(data);
 
           // Ignore stale responses from older keystrokes
           if (reqId !== attachAutocompleteToInput.__lastReqId) return;
+          attachAutocompleteToInput.__lastReqId = reqId;
 
-          if (!results.length) {
-            dropdown.innerHTML = `<div class="search-dropdown-empty">No players found for "${query}"</div>`;
-            dropdown.classList.add("open");
-            return;
-          }
-
-
-          activeIdx = -1;
-          dropdown.innerHTML = results.map((m) => {
-            const slug = extractSlug(m.url);
-            const tourBadgeClass = (m.tour || "").toLowerCase() === "atp" ? "atp" : "wta";
-            const tourLabel = (m.tour || "").toUpperCase();
-            return `
-              <div class="search-dropdown-item" data-name="${m.name}" data-slug="${slug}" data-tour="${m.tour}">
-                <div class="search-dropdown-avatar">${getInitials(m.name)}</div>
-                <div class="search-dropdown-info">
-                  <div class="search-dropdown-name">${highlightMatch(m.name, query)}</div>
-                  <div class="search-dropdown-tour">${tourLabel}</div>
+          if (data.length > 0) {
+            activeIdx = -1;
+            dropdown.innerHTML = data.map((m) => {
+              const slug = extractSlug(m.url);
+              return `
+                <div class="search-dropdown-item" data-name="${m.name}" data-slug="${slug}" data-tour="${m.tour}">
+                  <div class="search-dropdown-avatar">${getInitials(m.name)}</div>
+                  <div class="search-dropdown-info">
+                    <div class="search-dropdown-name">${highlightMatch(m.name, query)}</div>
+                    <div class="search-dropdown-tour">${(m.tour || "").toUpperCase()}</div>
+                  </div>
                 </div>
-              </div>
-            `;
-          }).join("");
+              `;
+            }).join("");
 
-          dropdown.querySelectorAll(".search-dropdown-item").forEach((item, idx) => {
-            item.addEventListener("click", () => setSelection(item));
-            item.addEventListener("mouseenter", () => {
-              activeIdx = idx;
-              const items = dropdown.querySelectorAll(".search-dropdown-item");
-              items.forEach((it, i) => it.classList.toggle("highlighted", i === activeIdx));
+            dropdown.classList.add("open");
+
+            dropdown.querySelectorAll(".search-dropdown-item").forEach((item, idx) => {
+              item.addEventListener("click", () => setSelection(item));
+              item.addEventListener("mouseenter", () => {
+                activeIdx = idx;
+                const items = dropdown.querySelectorAll(".search-dropdown-item");
+                items.forEach((it, i) => it.classList.toggle("highlighted", i === activeIdx));
+              });
             });
-          });
 
-          dropdown.classList.add("open");
-
-          // Keyboard navigation
-          const items = dropdown.querySelectorAll(".search-dropdown-item");
-          items.forEach((it, idx) => it.classList.toggle("highlighted", idx === activeIdx));
+            // Keyboard navigation
+            const items = dropdown.querySelectorAll(".search-dropdown-item");
+            items.forEach((it, idx) => it.classList.toggle("highlighted", idx === activeIdx));
+          } else if (data.length === 0) {
+            dropdown.innerHTML = `<div class="search-dropdown-empty">No players found</div>`;
+            dropdown.classList.add("open");
+          }
         } catch (err) {
-          console.warn(`Global search failed (${contextName}):`, err);
-          dropdown.innerHTML = `<div class="search-dropdown-empty">Search failed</div>`;
-          dropdown.classList.add("open");
+          // Ignore abort errors (they happen during fast typing)
+          if (err && err.name === "AbortError") return;
+
+          console.error(`Global search failed (${contextName}):`, err);
+          dropdown.innerHTML = "";
+          dropdown.classList.remove("open");
+        } finally {
+          // Ensure loader is removed even if fetch errors or is aborted
+          dropdown.classList.remove("open");
+          const wasLoading = dropdown.innerHTML.includes("Searching");
+          if (wasLoading) dropdown.innerHTML = "";
         }
       }, 300);
     });
