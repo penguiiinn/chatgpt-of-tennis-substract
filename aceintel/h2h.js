@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════ */
 
 // ─── API Config & State ─────────────────
-const API_BASE = "http://localhost:5000/api";
+const API_BASE = "https://aceintel-backend.onrender.com/api";
 let p1Key = null, p2Key = null;
 let playersList = [];
 

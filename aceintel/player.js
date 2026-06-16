@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════ */
 
 // ─── API Config & State ─────────────────
-const API_BASE = "http://localhost:5000/api";
+const API_BASE = "https://aceintel-backend.onrender.com/api";
 let currentPlayerKey = null;
 let playersList = [];
 
@@ -808,17 +808,17 @@ function getMockInsights(p) {
   const strengths = [];
   const weaknesses = [];
   const playStyle = (p.aiInsights && p.aiInsights.tags) || ["All-Court"];
-  
+
   if (p.serve?.acesPct?.value > 8) strengths.push("Strong server: high ace percentage.");
   if (p.serve?.breakPointsSavedPct?.value > 65) strengths.push("Clutch performer: saves high percentage of break points.");
   if (p.returnAnalytics?.returnGamesWon?.value > 28) strengths.push("Elite returner: breaks serve frequently.");
-  
+
   if (p.serve?.doubleFaultsPct?.value > 5) weaknesses.push("Inconsistent serve: high double fault rate.");
   if (p.returnAnalytics?.returnPointsWon?.value < 38) weaknesses.push("Vulnerable on return game.");
-  
+
   if (strengths.length === 0) strengths.push("Solid baseline rally tolerance.");
   if (weaknesses.length === 0) weaknesses.push("Can struggle in extremely fast conditions.");
-  
+
   const surfaceInsights = [`Strongest surface is ${p.bestSurface} with high win rates.`];
   const recentFormWins = Array.isArray(p.overview?.recentForm)
     ? p.overview.recentForm.filter(f => f === "W").length
@@ -827,7 +827,7 @@ function getMockInsights(p) {
     `Won ${recentFormWins} of the last 10 matches.`,
     `Currently ranked #${p.overview.currentRank}.`
   ];
-  
+
   return {
     strengths,
     weaknesses,

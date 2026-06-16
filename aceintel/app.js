@@ -6,7 +6,7 @@
   "use strict";
 
   // ─── State & API Config ─────────────────
-  const API_BASE = "http://localhost:5000/api";
+  const API_BASE = "https://aceintel-backend.onrender.com/api";
   let currentPlayer = "Anna Blinkova";
   let playersList = [];
 
