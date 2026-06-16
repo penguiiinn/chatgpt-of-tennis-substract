@@ -422,6 +422,7 @@ const scrapePlayerProfile = async (slugOrUrl) => {
     const profile = {
       overview: {
         name: fullname,
+        tour: isWta ? "WTA" : "ATP",
         age: calculateAge(dob),
         nationality: countryDetails.name,
         flag: countryDetails.flag,

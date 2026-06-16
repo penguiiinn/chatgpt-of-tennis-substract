@@ -177,23 +177,70 @@ function renderOverview(p) {
   const wins = parseInt(o.careerWinLoss.split("-")[0]);
   const losses = parseInt(o.careerWinLoss.split("-")[1]);
 
+  // Determine Tour (ATP / WTA)
+  const isATP = o.tour === "ATP" 
+    || ["Carlos Alcaraz", "Jannik Sinner", "Novak Djokovic", "Alexander Zverev", "Daniil Medvedev", "Holger Rune", "Taylor Fritz", "Ben Shelton", "Alex de Minaur"].includes(o.name) 
+    || (o.nationality && !["russia", "poland", "usa", "kazakhstan"].includes(o.nationality.toLowerCase()) && !o.name.includes("Świątek") && !o.name.includes("Blinkova") && !o.name.includes("Gauff") && !o.name.includes("Rybakina"));
+  const tourLabel = isATP ? "ATP" : "WTA";
+
+  // Calculate Form Streak
+  let streakVal = "N/A";
+  if (o.recentForm && o.recentForm.length > 0) {
+    const first = o.recentForm[0];
+    let count = 0;
+    for (let i = 0; i < o.recentForm.length; i++) {
+      if (o.recentForm[i] === first) {
+        count++;
+      } else {
+        break;
+      }
+    }
+    streakVal = `${count}${first}`;
+  }
+
+  const streakColor = streakVal.endsWith("W") ? "var(--green)" : streakVal.endsWith("L") ? "var(--red)" : "inherit";
+
+  // Hard/Clay/Grass Win Percentages
+  const hardWinPct = p.surfaces.hard ? p.surfaces.hard.winPct : 0;
+  const clayWinPct = p.surfaces.clay ? p.surfaces.clay.winPct : 0;
+  const grassWinPct = p.surfaces.grass ? p.surfaces.grass.winPct : 0;
+
   header.innerHTML = `
-      <div class="profile-top">
-        <div class="profile-avatar">${getInitials(o.name)}</div>
-        <div class="profile-info">
-          <div class="profile-name">${o.name}</div>
-          <div class="profile-country">${o.flag} ${o.nationality} • ${o.handedness} • ${o.height}</div>
-          <div class="profile-tags">
-            <span class="profile-tag">🎾 ${o.coach}</span>
-            <span class="profile-tag">${o.titlesTotal} Titles</span>
-            <span class="profile-tag form-hot">${o.ytdWinPct}% YTD</span>
+      <div class="profile-top" style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:24px;">
+        <div style="display:flex; gap:28px; align-items:flex-start; min-width:300px;">
+          <div class="profile-avatar">${getInitials(o.name)}</div>
+          <div class="profile-info">
+            <div class="profile-name">${o.name}</div>
+            <div class="profile-country">${o.flag} ${o.nationality} • ${o.handedness} • ${o.height}</div>
+            <div class="profile-tags">
+              <span class="profile-tag">🎾 ${o.coach}</span>
+              <span class="profile-tag">${o.titlesTotal} Titles</span>
+              <span class="profile-tag form-hot">${o.ytdWinPct}% YTD</span>
+            </div>
+          </div>
+        </div>
+        <!-- Hard/Clay/Grass Win Rates Display Block -->
+        <div class="profile-surface-rates" style="display:flex; gap:12px; background:rgba(255,255,255,0.02); padding:16px 20px; border-radius:16px; border:1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+          <div style="text-align:center;">
+            <div style="font-size:0.65rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; font-weight:600; margin-bottom:4px;">🏟️ Hard</div>
+            <div style="font-size:1.15rem; font-weight:800; font-family:var(--font-mono); color:var(--cyan);">${hardWinPct}%</div>
+          </div>
+          <div style="width:1px; background:var(--border); margin:0 8px;"></div>
+          <div style="text-align:center;">
+            <div style="font-size:0.65rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; font-weight:600; margin-bottom:4px;">🧱 Clay</div>
+            <div style="font-size:1.15rem; font-weight:800; font-family:var(--font-mono); color:var(--amber);">${clayWinPct}%</div>
+          </div>
+          <div style="width:1px; background:var(--border); margin:0 8px;"></div>
+          <div style="text-align:center;">
+            <div style="font-size:0.65rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; font-weight:600; margin-bottom:4px;">🌿 Grass</div>
+            <div style="font-size:1.15rem; font-weight:800; font-family:var(--font-mono); color:var(--green);">${grassWinPct}%</div>
           </div>
         </div>
       </div>
-      <div class="profile-stats-grid">
+      <div class="profile-stats-grid" style="margin-top:24px;">
         <div class="profile-stat-cell">
           <div class="profile-stat-val">#${o.currentRank}</div>
-          <div class="profile-stat-lbl">Current Rank</div>
+          <div class="profile-stat-lbl">${tourLabel} Rank</div>
         </div>
         <div class="profile-stat-cell">
           <div class="profile-stat-val">#${o.peakRank}</div>
@@ -210,6 +257,10 @@ function renderOverview(p) {
         <div class="profile-stat-cell">
           <div class="profile-stat-val">${o.ytdWinLoss}</div>
           <div class="profile-stat-lbl">YTD W-L</div>
+        </div>
+        <div class="profile-stat-cell">
+          <div class="profile-stat-val" style="background:none; -webkit-text-fill-color:${streakColor}; color:${streakColor}">${streakVal}</div>
+          <div class="profile-stat-lbl">Form Streak</div>
         </div>
         <div class="profile-stat-cell">
           <div class="profile-stat-val">${o.age}</div>

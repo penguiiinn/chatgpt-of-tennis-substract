@@ -271,6 +271,7 @@ const PROFILE_DB = {
   "Anna Blinkova": {
     overview: {
       name: "Anna Blinkova",
+      tour: "WTA",
       age: 25,
       nationality: "Russia",
       flag: "🇷🇺",
@@ -336,6 +337,7 @@ const PROFILE_DB = {
   "Carlos Alcaraz": {
     overview: {
       name: "Carlos Alcaraz",
+      tour: "ATP",
       age: 23,
       nationality: "Spain",
       flag: "🇪🇸",
@@ -401,6 +403,7 @@ const PROFILE_DB = {
   "Iga Swiatek": {
     overview: {
       name: "Iga Świątek",
+      tour: "WTA",
       age: 25,
       nationality: "Poland",
       flag: "🇵🇱",
@@ -466,6 +469,7 @@ const PROFILE_DB = {
   "Jannik Sinner": {
     overview: {
       name: "Jannik Sinner",
+      tour: "ATP",
       age: 24,
       nationality: "Italy",
       flag: "🇮🇹",
