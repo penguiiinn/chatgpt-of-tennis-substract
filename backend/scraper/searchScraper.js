@@ -200,7 +200,9 @@ async function scrapeEloPage(url, tour, opts = {}) {
       : 'a[href*="/cgi-bin/wplayer.cgi?p="], a[href*="/cgi-bin/wplayer-classic.cgi?p="]';
 
     $(linkSelector).each((_i, el) => {
-      const name = $(el).text().trim();
+      const tr = $(el).closest("tr");
+      // Normalize player name (replace non-breaking spaces and other redundant whitespace)
+      const name = $(el).text().replace(/\s+/g, " ").trim();
       let href = $(el).attr("href") || "";
 
       // Skip empty names or non-player links (like "All Men's Elo Ratings")
@@ -211,9 +213,34 @@ async function scrapeEloPage(url, tour, opts = {}) {
         href = "https://www.tennisabstract.com" + href;
       }
 
+      let age = null;
+      let elo = null;
+      let rank = null;
+
+      if (tr.length) {
+        const tds = tr.find("td");
+        if (tds.length >= 16) {
+          // Col 2: Age
+          const ageText = tds.eq(2).text().trim();
+          if (ageText) {
+            age = Math.floor(parseFloat(ageText)) || null;
+          }
+          // Col 3: Elo
+          const eloText = tds.eq(3).text().trim();
+          if (eloText) {
+            elo = Math.round(parseFloat(eloText)) || null;
+          }
+          // Col 15: ATP/WTA Rank
+          const rankText = tds.eq(15).text().trim();
+          if (rankText) {
+            rank = parseInt(rankText, 10) || null;
+          }
+        }
+      }
+
       // De-dup within this scrape
       if (!players.some(p => p.url === href)) {
-        players.push({ name, url: href, tour });
+        players.push({ name, url: href, tour, age, elo, rank });
       }
     });
 

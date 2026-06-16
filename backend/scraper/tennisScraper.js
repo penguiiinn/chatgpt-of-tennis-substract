@@ -81,6 +81,20 @@ const scrapePlayerProfile = async (slugOrUrl) => {
     let slug = "";
     let isWta = false;
     let url = "";
+    let cachedPlayer = null;
+
+    // Helper for slug generation
+    const toTennisAbstractSlug = (name) => {
+      if (!name) return "";
+      let normalized = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      if (normalized.includes(",")) {
+        const parts = normalized.split(",").map(p => p.trim());
+        if (parts.length === 2) normalized = `${parts[1]} ${parts[0]}`;
+      }
+      normalized = normalized.replace(/[^a-zA-Z0-9\s\-]/g, "");
+      const parts = normalized.split(/[\s\-]+/);
+      return parts.map(part => part.charAt(0).toUpperCase() + part.slice(1)).join("");
+    };
 
     // Normalize slug or url
     if (slugOrUrl.startsWith("http://") || slugOrUrl.startsWith("https://")) {
@@ -89,26 +103,34 @@ const scrapePlayerProfile = async (slugOrUrl) => {
       slug = urlObj.searchParams.get("p") || "";
       isWta = slugOrUrl.includes("wplayer.cgi") || slugOrUrl.includes("wplayer-classic.cgi");
     } else {
-      slug = slugOrUrl.trim().replace(/[\s\-]+/g, "");
-      // Query player search cache
-      const cache = getPlayerCache() || [];
-      const cachedPlayer = cache.find(p => {
-        if (!p.url) return false;
-        const u = new URL(p.url);
-        return (u.searchParams.get("p") || "").toLowerCase() === slug.toLowerCase();
-      });
+      slug = toTennisAbstractSlug(slugOrUrl);
+    }
 
-      if (cachedPlayer) {
-        url = cachedPlayer.url;
-        isWta = cachedPlayer.tour === "WTA";
-        // Extract exact case-sensitive slug from cached URL if possible
-        const cachedUrlObj = new URL(cachedPlayer.url);
-        slug = cachedUrlObj.searchParams.get("p") || slug;
-      } else {
-        // Fallback guess: default ATP URL, check WTA if it fails or returns empty
-        url = `https://www.tennisabstract.com/cgi-bin/player.cgi?p=${slug}`;
-        isWta = false;
-      }
+    // Try to find in cache based on slug or name
+    const cache = getPlayerCache() || [];
+    cachedPlayer = cache.find(p => {
+      if (!p.url) return false;
+      const u = new URL(p.url);
+      const pSlug = u.searchParams.get("p") || "";
+      return pSlug.toLowerCase() === slug.toLowerCase();
+    });
+
+    if (!cachedPlayer) {
+      const normName = slugOrUrl.toLowerCase().replace(/[^a-z0-9]/g, "");
+      cachedPlayer = cache.find(p => {
+        const cacheNorm = p.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+        return cacheNorm === normName || cacheNorm.includes(normName) || normName.includes(cacheNorm);
+      });
+    }
+
+    if (cachedPlayer) {
+      url = cachedPlayer.url;
+      isWta = cachedPlayer.tour === "WTA";
+      const cachedUrlObj = new URL(cachedPlayer.url);
+      slug = cachedUrlObj.searchParams.get("p") || slug;
+    } else if (!url) {
+      url = `https://www.tennisabstract.com/cgi-bin/player.cgi?p=${slug}`;
+      isWta = false;
     }
 
     if (!slug) {
@@ -132,7 +154,7 @@ const scrapePlayerProfile = async (slugOrUrl) => {
 
     // Double check if player biography data exists in the HTML page.
     // If we guessed ATP but it failed or Biography fullname variable is missing, try WTA page
-    const hasFullnameVar = html && html.includes("var fullname =");
+    let hasFullnameVar = html && html.includes("var fullname =");
     if ((!hasFullnameVar || htmlFetchError) && !slugOrUrl.startsWith("http")) {
       isWta = !isWta;
       const fallbackUrl = isWta
@@ -147,9 +169,14 @@ const scrapePlayerProfile = async (slugOrUrl) => {
         });
         html = res.data;
         url = fallbackUrl;
+        hasFullnameVar = html && html.includes("var fullname =");
       } catch (err) {
         console.warn(`[Scraper] Alternative tour URL fetch also failed: ${err.message}`);
       }
+    }
+
+    if (!hasFullnameVar) {
+      console.warn(`[Scraper Warning] Failed to fetch player biography metadata from CGI url: ${url}. (Using cached/fallback values if available). Error: ${htmlFetchError ? htmlFetchError.message : 'Missing var fullname'}`);
     }
 
     // Parse CGI variables from the page HTML
@@ -159,15 +186,43 @@ const scrapePlayerProfile = async (slugOrUrl) => {
       return match ? (isString ? match[1].trim() : parseFloat(match[1])) : null;
     };
 
-    const fullname = getValue("fullname") || slug.replace(/([A-Z])/g, ' $1').trim();
+    const fullname = getValue("fullname") || (cachedPlayer ? cachedPlayer.name : slug.replace(/([A-Z])/g, ' $1').trim());
     const dob = getValue("dob");
     const ht = getValue("ht", false);
-    const hand = getValue("hand") || "R";
-    const backhand = getValue("backhand") || "2";
-    const countryCode = getValue("country") || "USA";
-    const currentrank = getValue("currentrank", false) || 999;
-    const peakrank = getValue("peakrank", false) || 999;
-    const eloRating = getValue("elo_rating", false) || 1500;
+    // NOTE: hand/backhand may be null if player is not found on TennisAbstract
+    const hand = getValue("hand");
+    const backhand = getValue("backhand");
+    const countryCode = getValue("country"); // Remove hardcoded "USA" default
+
+    // Metadata fallbacks from cachedPlayer (these are trustworthy when available)
+    const cachedRank = (cachedPlayer && cachedPlayer.rank) ? cachedPlayer.rank : null;
+    const cachedAge = (cachedPlayer && cachedPlayer.age) ? cachedPlayer.age : null;
+    const cachedElo = (cachedPlayer && cachedPlayer.elo) ? cachedPlayer.elo : null;
+
+    // Debug logs for field sources
+    console.log(`[Debug] Field sources for ${fullname}:`);
+    console.log(`  - rank: TennisAbstract=${getValue("currentrank", false)}, cache=${cachedRank}, fallback=Unknown`);
+    console.log(`  - peakRank: TennisAbstract=${getValue("peakrank", false)}, fallback=Unknown`);
+    console.log(`  - country: TennisAbstract=${countryCode || 'null'}, cache=${cachedPlayer ? cachedPlayer.country : 'N/A'}`);
+    console.log(`  - elo: TennisAbstract=${getValue("elo_rating", false)}, cache=${cachedElo}, fallback=Unknown`);
+    console.log(`  - age: TennisAbstract=${dob || 'null'}, cache=${cachedAge}`);
+    console.log(`  - hand: TennisAbstract=${hand || 'null'}, backhand=${backhand || 'null'}`);
+
+    // Use TennisAbstract data first, then cache, then mark as Unknown (no fake defaults)
+    // Rank: prefer real data, if unavailable mark as Unknown (not fake #999)
+    const rawRank = getValue("currentrank", false);
+    const currentrank = rawRank !== null ? rawRank : (cachedRank !== null ? cachedRank : "Unknown");
+
+    const rawPeakRank = getValue("peakrank", false);
+    const peakrank = rawPeakRank !== null ? rawPeakRank : (currentrank !== "Unknown" ? currentrank : "Unknown");
+
+    // Elo: prefer real data, if unavailable use cache, then Unknown (not fake 1500)
+    const rawElo = getValue("elo_rating", false);
+    const eloRating = rawElo !== null ? rawElo : (cachedElo !== null ? cachedElo : "Unknown");
+
+    // Age calculation from DOB
+    const parsedAge = calculateAge(dob);
+    const ageValue = (parsedAge === "N/A" && cachedAge) ? cachedAge : parsedAge;
 
     // Fetch the JS Match History / Splits fragment
     const fragUrl = `https://www.tennisabstract.com/jsfrags/${slug}.js`;
@@ -183,20 +238,21 @@ const scrapePlayerProfile = async (slugOrUrl) => {
       throw new Error(`Failed to extract player_frag from JS fragment for ${slug}`);
     }
     const player_frag = fragMatch[1];
-    
+
     const $ = cheerio.load(player_frag);
 
-    // 1. Surface Elos from year-end-rankings table
-    let hardElo = eloRating;
-    let clayElo = eloRating;
-    let grassElo = eloRating;
+    // 1. Surface Elos from year-end-rankings table (use numeric 1500 as fallback for calculations only)
+    const eloNumeric = (eloRating === "Unknown") ? 1500 : eloRating;
+    let hardElo = eloNumeric;
+    let clayElo = eloNumeric;
+    let grassElo = eloNumeric;
 
     $("#year-end-rankings tbody tr").first().each((i, tr) => {
       const tds = $(tr).find("td");
       if (tds.length >= 11) {
-        hardElo = parseInt(tds.eq(6).text().trim(), 10) || eloRating;
-        clayElo = parseInt(tds.eq(8).text().trim(), 10) || eloRating;
-        grassElo = parseInt(tds.eq(10).text().trim(), 10) || eloRating;
+        hardElo = parseInt(tds.eq(6).text().trim(), 10) || eloNumeric;
+        clayElo = parseInt(tds.eq(8).text().trim(), 10) || eloNumeric;
+        grassElo = parseInt(tds.eq(10).text().trim(), 10) || eloNumeric;
       }
     });
 
@@ -413,17 +469,21 @@ const scrapePlayerProfile = async (slugOrUrl) => {
     const top10WinPct = top10Data ? top10Data.winPct : 0.0;
 
     const countryDetails = getCountryDetails(countryCode);
-    const handedness = hand === "L" ? "Left-Handed" : "Right-Handed";
-    const backhandType = backhand === "1" ? "One-Handed" : "Two-Handed";
+    // Handle null hand/backhand values - mark as Unknown instead of defaulting
+    const handedness = hand === "L" ? "Left-Handed" : (hand === "R" ? "Right-Handed" : "Unknown");
+    const backhandType = backhand === "1" ? "One-Handed" : (backhand === "2" ? "Two-Handed" : "Unknown");
 
-    // Build the dynamic bio summary text
-    const bioSummary = `${fullname} is a ${handedness} player from ${countryDetails.name} currently ranked #${currentrank} with a peak rank of #${peakrank}. ${fullname} has an overall win rate of ${careerWinPct}% with an Elo rating of ${eloRating}. Strongest on ${bestSurface}.`;
+    // Build the dynamic bio summary text, handling Unknown values gracefully
+    const rankStr = (currentrank === "Unknown") ? "unranked" : `#${currentrank}`;
+    const peakRankStr = (peakrank === "Unknown") ? "unranked" : `#${peakrank}`;
+    const eloStr = (eloRating === "Unknown") ? "unrated" : eloRating;
+    const bioSummary = `${fullname} is a ${handedness} player from ${countryDetails.name} currently ranked ${rankStr} with a peak rank of ${peakRankStr}. ${fullname} has an overall win rate of ${careerWinPct}% with an Elo rating of ${eloStr}. Strongest on ${bestSurface}.`;
 
     const profile = {
       overview: {
         name: fullname,
         tour: isWta ? "WTA" : "ATP",
-        age: calculateAge(dob),
+        age: ageValue,
         nationality: countryDetails.name,
         flag: countryDetails.flag,
         handedness: `${handedness} (${backhandType} Backhand)`,

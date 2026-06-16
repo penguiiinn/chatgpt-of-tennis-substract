@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════ */
 
 // ─── API Config & State ─────────────────
-const API_BASE = "https://aceintel-backend.onrender.com/api";
+const API_BASE = "https://aceintel-backend.onrender.com";
 let p1Key = null, p2Key = null;
 let playersList = [];
 
@@ -108,9 +108,13 @@ function initAutocomplete() {
         input.setAttribute("aria-busy", "true");
 
         try {
-          const res = await fetch(`${API_BASE}/search?name=${encodeURIComponent(query)}`);
+          const url = `${API_BASE}/api/search?q=${encodeURIComponent(query)}&name=${encodeURIComponent(query)}&limit=10`;
+          console.log("API URL being called:", url);
+          const res = await fetch(url);
+          console.log("fetch status:", res.status);
           if (!res.ok) throw new Error("Search failed");
           const matches = await res.json();
+          console.log("response JSON:", matches);
 
           if (matches.length === 0) {
             results.innerHTML = `<div style="padding:12px 16px;color:var(--text-muted);font-size:0.85rem">No players found</div>`;
@@ -219,15 +223,26 @@ async function buildReport(a, b) {
   let data = null;
   let matchupIntel = null;
   try {
+    const url1 = `${API_BASE}/api/h2h?p1=${encodeURIComponent(a)}&p2=${encodeURIComponent(b)}`;
+    const url2 = `${API_BASE}/api/matchup/${encodeURIComponent(a)}/${encodeURIComponent(b)}`;
+    console.log("API URL being called:", url1);
+    console.log("API URL being called:", url2);
+
     const [h2hRes, matchupRes] = await Promise.all([
-      fetch(`${API_BASE}/h2h?p1=${encodeURIComponent(a)}&p2=${encodeURIComponent(b)}`),
-      fetch(`${API_BASE}/matchup/${encodeURIComponent(a)}/${encodeURIComponent(b)}`)
+      fetch(url1),
+      fetch(url2)
     ]);
+    
+    console.log("fetch status:", h2hRes.status);
+    console.log("fetch status:", matchupRes.status);
+
     if (h2hRes.ok) {
       data = await h2hRes.json();
+      console.log("response JSON:", data);
     }
     if (matchupRes.ok) {
       matchupIntel = await matchupRes.json();
+      console.log("response JSON:", matchupIntel);
     }
   } catch (err) {
     console.warn("Failed to fetch API data from server, using fallback data", err);
@@ -262,7 +277,7 @@ async function buildReport(a, b) {
   const paIsDataA = (a === dataA);
 
   renderOverview(pa, pb, meetings, paIsDataA);
-  renderSurfaces(pa, pb);
+  renderSurfaces(pa, pb, meetings);
   renderHistory(pa, pb, meetings, paIsDataA);
   renderClash(pa, pb, style, paIsDataA);
   renderMatchup(pa, pb, matchup, paIsDataA);
@@ -340,6 +355,91 @@ function renderOverview(pa, pb, meetings, paIsDataA) {
 
   document.title = `${oa.name} vs ${ob.name} — AceIntel`;
 
+  // Dynamic tour label calculation
+  const tourA = oa.tour || (["Carlos Alcaraz", "Jannik Sinner", "Novak Djokovic"].includes(oa.name) ? "ATP" : "WTA");
+  const tourB = ob.tour || (["Carlos Alcaraz", "Jannik Sinner", "Novak Djokovic"].includes(ob.name) ? "ATP" : "WTA");
+
+  // Form Streak Helper
+  const getFormStreak = (arr) => {
+    if (!arr || arr.length === 0) return "N/A";
+    const first = arr[0];
+    let count = 0;
+    for (let i = 0; i < arr.length; i++) {
+      if (arr[i] === first) count++;
+      else break;
+    }
+    return `${count}${first}`;
+  };
+
+  const streakA = getFormStreak(oa.recentForm);
+  const streakB = getFormStreak(ob.recentForm);
+
+  const isWinA = streakA.endsWith("W");
+  const isWinB = streakB.endsWith("W");
+  const numStreakA = parseInt(streakA) || 0;
+  const numStreakB = parseInt(streakB) || 0;
+
+  let isStreakABetter = false;
+  let isStreakEqual = false;
+  if (isWinA && !isWinB) isStreakABetter = true;
+  else if (!isWinA && isWinB) isStreakABetter = false;
+  else if (isWinA && isWinB) {
+    if (numStreakA === numStreakB) isStreakEqual = true;
+    else isStreakABetter = numStreakA > numStreakB;
+  } else {
+    if (numStreakA === numStreakB) isStreakEqual = true;
+    else isStreakABetter = numStreakA < numStreakB; // fewer consecutive losses is better
+  }
+
+  const streakColorA = isStreakEqual ? "var(--text-muted)" : (isStreakABetter ? "var(--green)" : "var(--red-dim)");
+  const streakColorB = isStreakEqual ? "var(--text-muted)" : (isStreakABetter ? "var(--red-dim)" : "var(--green)");
+  const streakBadgeA = isStreakEqual ? "=" : (isStreakABetter ? "▲" : "▼");
+  const streakBadgeB = isStreakEqual ? "=" : (isStreakABetter ? "▼" : "▲");
+
+  const buildComparisonRow = (label, valA, valB, suffix = "", lowerIsBetter = false) => {
+    let indicatorClassA = "", indicatorClassB = "";
+    let indicatorBadgeA = "", indicatorBadgeB = "";
+
+    const numA = parseFloat(valA);
+    const numB = parseFloat(valB);
+
+    if (!isNaN(numA) && !isNaN(numB)) {
+      if (numA === numB) {
+        indicatorClassA = "equal";
+        indicatorClassB = "equal";
+        indicatorBadgeA = `<span style="color:var(--text-muted); font-size:0.75rem;">=</span>`;
+        indicatorBadgeB = `<span style="color:var(--text-muted); font-size:0.75rem;">=</span>`;
+      } else {
+        const aIsBetter = lowerIsBetter ? (numA < numB) : (numA > numB);
+        if (aIsBetter) {
+          indicatorClassA = "better";
+          indicatorClassB = "worse";
+          indicatorBadgeA = `<span style="color:var(--green); font-size:0.8rem; font-weight:bold;">▲</span>`;
+          indicatorBadgeB = `<span style="color:var(--red); font-size:0.8rem; font-weight:bold;">▼</span>`;
+        } else {
+          indicatorClassA = "worse";
+          indicatorClassB = "better";
+          indicatorBadgeA = `<span style="color:var(--red); font-size:0.8rem; font-weight:bold;">▼</span>`;
+          indicatorBadgeB = `<span style="color:var(--green); font-size:0.8rem; font-weight:bold;">▲</span>`;
+        }
+      }
+    }
+
+    return `
+      <div style="display:grid; grid-template-columns:1fr auto 1fr; align-items:center; padding:12px 16px; border-bottom:1px solid rgba(255,255,255,0.02); font-size:0.85rem;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          ${indicatorBadgeA}
+          <span style="font-family:var(--font-mono); font-weight:700; ${indicatorClassA === 'better' ? 'color:var(--green);' : indicatorClassA === 'worse' ? 'color:var(--text-muted);' : ''}">${valA}${suffix}</span>
+        </div>
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em; font-weight:600; text-align:center; min-width:140px;">${label}</div>
+        <div style="display:flex; align-items:center; gap:8px; justify-content:flex-end;">
+          <span style="font-family:var(--font-mono); font-weight:700; ${indicatorClassB === 'better' ? 'color:var(--green);' : indicatorClassB === 'worse' ? 'color:var(--text-muted);' : ''}">${valB}${suffix}</span>
+          ${indicatorBadgeB}
+        </div>
+      </div>
+    `;
+  };
+
   const html = `
       <div class="overview-split reveal">
         <!-- P1 -->
@@ -388,6 +488,64 @@ function renderOverview(pa, pb, meetings, paIsDataA) {
           </div>
         </div>
       </div>
+
+      <!-- Overview stats comparative grid extension -->
+      <div class="h2h-comparison-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:24px; margin-top:32px;">
+        <!-- rankings card -->
+        <div class="h2h-comp-card reveal" style="background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-xl); overflow:hidden; padding-bottom:12px;">
+          <div style="background:rgba(255,255,255,0.02); padding:16px 20px; border-bottom:1px solid var(--border); font-weight:700; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.06em; display:flex; align-items:center; gap:10px; color:var(--accent-hover);">
+            <span>📈</span> Rankings & Form Comparison
+          </div>
+          <div style="display:flex; flex-direction:column;">
+            ${buildComparisonRow(`${tourA} Rank`, oa.currentRank, ob.currentRank, "", true)}
+            ${buildComparisonRow("Peak Rank", oa.peakRank, ob.peakRank, "", true)}
+            ${buildComparisonRow("Elo Rating", oa.elo, ob.elo, "")}
+            ${buildComparisonRow("Career Win Rate", oa.careerWinPct, ob.careerWinPct, "%")}
+            ${buildComparisonRow("YTD Win Rate", oa.ytdWinPct, ob.ytdWinPct, "%")}
+            <!-- Form Streak Row -->
+            <div style="display:grid; grid-template-columns:1fr auto 1fr; align-items:center; padding:12px 16px; border-bottom:1px solid rgba(255,255,255,0.02); font-size:0.85rem;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="color:${streakColorA === 'var(--green)' ? 'var(--green)' : streakColorA === 'var(--red-dim)' ? 'var(--red)' : 'var(--text-muted)'}; font-size:0.8rem; font-weight:bold;">${streakBadgeA}</span>
+                <span style="font-family:var(--font-mono); font-weight:700; color:${streakColorA}">${streakA}</span>
+              </div>
+              <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em; font-weight:600; text-align:center; min-width:140px;">Form Streak</div>
+              <div style="display:flex; align-items:center; gap:8px; justify-content:flex-end;">
+                <span style="font-family:var(--font-mono); font-weight:700; color:${streakColorB}">${streakB}</span>
+                <span style="color:${streakColorB === 'var(--green)' ? 'var(--green)' : streakColorB === 'var(--red-dim)' ? 'var(--red)' : 'var(--text-muted)'}; font-size:0.8rem; font-weight:bold;">${streakBadgeB}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- serve card -->
+        <div class="h2h-comp-card reveal" style="background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-xl); overflow:hidden; padding-bottom:12px;">
+          <div style="background:rgba(255,255,255,0.02); padding:16px 20px; border-bottom:1px solid var(--border); font-weight:700; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.06em; display:flex; align-items:center; gap:10px; color:var(--accent-hover);">
+            <span>🎯</span> Serve Analytics Comparison
+          </div>
+          <div style="display:flex; flex-direction:column;">
+            ${buildComparisonRow("Serve Rating", pa.strengthMeter.serve, pb.strengthMeter.serve, "")}
+            ${buildComparisonRow("First Serve In", pa.serve.firstServePct.value, pb.serve.firstServePct.value, "%")}
+            ${buildComparisonRow("1st Serve Won", pa.serve.firstServeWonPct.value, pb.serve.firstServeWonPct.value, "%")}
+            ${buildComparisonRow("2nd Serve Won", pa.serve.secondServeWonPct.value, pb.serve.secondServeWonPct.value, "%")}
+            ${buildComparisonRow("Aces %", pa.serve.acesPct.value, pb.serve.acesPct.value, "%")}
+            ${buildComparisonRow("Double Faults %", pa.serve.doubleFaultsPct.value, pb.serve.doubleFaultsPct.value, "%", true)}
+            ${buildComparisonRow("Break Points Saved", pa.serve.breakPointsSavedPct.value, pb.serve.breakPointsSavedPct.value, "%")}
+          </div>
+        </div>
+
+        <!-- return card -->
+        <div class="h2h-comp-card reveal" style="background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-xl); overflow:hidden; padding-bottom:12px;">
+          <div style="background:rgba(255,255,255,0.02); padding:16px 20px; border-bottom:1px solid var(--border); font-weight:700; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.06em; display:flex; align-items:center; gap:10px; color:var(--accent-hover);">
+            <span>🛡️</span> Return Analytics Comparison
+          </div>
+          <div style="display:flex; flex-direction:column;">
+            ${buildComparisonRow("Return Rating", pa.strengthMeter.return, pb.strengthMeter.return, "")}
+            ${buildComparisonRow("Return Points Won", pa.returnAnalytics.returnPointsWon.value, pb.returnAnalytics.returnPointsWon.value, "%")}
+            ${buildComparisonRow("BP Conversion", pa.returnAnalytics.breakConversion.value, pb.returnAnalytics.breakConversion.value, "%")}
+            ${buildComparisonRow("Return Games Won", pa.returnAnalytics.returnGamesWon.value, pb.returnAnalytics.returnGamesWon.value, "%")}
+          </div>
+        </div>
+      </div>
     `;
 
   $("#overview-content").innerHTML = html;
@@ -397,13 +555,33 @@ function renderOverview(pa, pb, meetings, paIsDataA) {
 // ═══════════════════════════════════════
 // SURFACES
 // ═══════════════════════════════════════
-function renderSurfaces(pa, pb) {
+function renderSurfaces(pa, pb, meetings) {
   const surfaces = [
     { key: "grass", label: "Grass", icon: "🌿", cls: "grass" },
     { key: "clay", label: "Clay", icon: "🧱", cls: "clay" },
     { key: "hard", label: "Hard Court", icon: "🏟️", cls: "hard" },
     { key: "indoor", label: "Indoor", icon: "🏢", cls: "indoor" },
   ];
+
+  // Compute surface-wise H2H record
+  const surfaceH2H = { grass: { a: 0, b: 0 }, clay: { a: 0, b: 0 }, hard: { a: 0, b: 0 }, indoor: { a: 0, b: 0 } };
+  
+  if (meetings && meetings.meetings) {
+    const nameA = pa.overview.name.toLowerCase().split(" ")[0];
+    meetings.meetings.forEach(m => {
+      const winnerName = m.winner.toLowerCase();
+      const isWinnerA = winnerName.includes(nameA);
+      
+      const sKey = m.surface.toLowerCase(); // 'hard', 'clay', 'grass', 'indoor'
+      if (surfaceH2H[sKey]) {
+        if (isWinnerA) {
+          surfaceH2H[sKey].a++;
+        } else {
+          surfaceH2H[sKey].b++;
+        }
+      }
+    });
+  }
 
   const stats = [
     { key: "winPct", label: "Win %", fmt: v => v + "%" },
@@ -444,6 +622,10 @@ function renderSurfaces(pa, pb) {
           <div class="surface-compare-header">
             <div class="surface-compare-icon">${s.icon}</div>
             <div class="surface-compare-title">${s.label}</div>
+            <!-- Surface H2H Record -->
+            <span style="margin-left: 16px; background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: var(--radius-sm); font-size: 0.8rem; font-family: var(--font-mono); font-weight: 700; color: var(--text-primary)">
+              H2H: ${surfaceH2H[s.key].a} – ${surfaceH2H[s.key].b}
+            </span>
             <span class="surface-strength strength-${da.strength.toLowerCase()}" style="margin-left:auto">${da.strength}</span>
             <span style="margin:0 8px;color:var(--text-muted)">vs</span>
             <span class="surface-strength strength-${db.strength.toLowerCase()}">${db.strength}</span>
@@ -499,7 +681,10 @@ function renderHistory(pa, pb, meetings, paIsDataA) {
       </div>
     `;
 
-  const tableRows = meetings.meetings.map((m, i) => {
+  // Slice meetings list to show only the last 5 meetings
+  const last5Meetings = meetings.meetings.slice(0, 5);
+
+  const tableRows = last5Meetings.map((m, i) => {
     // Determine if winner is p1 or p2 (fuzzy match on name)
     const winnerIsA = oa.name.toLowerCase().includes(m.winner.toLowerCase().split(" ")[0].toLowerCase())
       || m.winner.toLowerCase().includes(oa.name.toLowerCase().split(" ")[0].toLowerCase());

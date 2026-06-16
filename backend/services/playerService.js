@@ -91,6 +91,18 @@ const getPlayerProfile = async (nameOrSlug) => {
     if (oppProfile) {
       const playerElo = profile.overview.elo;
       const oppElo = oppProfile.overview.elo;
+
+      // Handle Unknown elo values in predictions
+      if (playerElo === "Unknown" || oppElo === "Unknown") {
+        profile.predictions[oppName] = {
+          winChance: 50,
+          confidence: "Unknown",
+          surface: profile.bestSurface,
+          reasoning: `Insufficient data to generate prediction. Player or opponent Elo rating is unknown.`
+        };
+        return;
+      }
+
       const eloDiff = playerElo - oppElo;
       const winChance = Math.round((1 / (1 + Math.pow(10, -eloDiff / 400))) * 100);
 
