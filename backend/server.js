@@ -15,6 +15,8 @@ const liveRoutes = require("./routes/liveRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 // Step 6 — new prediction engine route (separate from legacy /api/predictions)
 const predictionEngineRoutes = require("./routes/predictionRoutes");
+// Step 7 — Betting Intelligence Layer
+const bettingRoutes = require("./routes/bettingRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -41,6 +43,8 @@ app.use("/api/live", liveRoutes);
 app.use("/api/profile", profileRoutes);
 // Step 6 — Prediction Engine (also accessible via existing /api/predictions/match)
 app.use("/api/prediction", predictionEngineRoutes);
+// Step 7 — Betting Intelligence Layer
+app.use("/api/betting", bettingRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {
