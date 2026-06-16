@@ -7,6 +7,8 @@ const surfaceRoutes = require("./routes/surfaceRoutes");
 const matchRoutes = require("./routes/matchRoutes");
 const h2hRoutes = require("./routes/h2hRoutes");
 const predictionRoutes = require("./routes/predictionRoutes");
+const searchRoutes = require("./routes/searchRoutes");
+const { warmCache } = require("./scraper/searchScraper");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -26,6 +28,7 @@ app.use("/api/surfaces", surfaceRoutes);
 app.use("/api/matches", matchRoutes);
 app.use("/api/h2h", h2hRoutes);
 app.use("/api/predictions", predictionRoutes);
+app.use("/api/search", searchRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {
@@ -39,4 +42,6 @@ app.use((err, req, res, next) => {
 // Start Server
 app.listen(PORT, () => {
   console.log(`[AceIntel Server] Running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+  // Pre-warm the Tennis Abstract player cache
+  warmCache();
 });
