@@ -9,7 +9,7 @@ let playerCache = [];
 let lastCacheTime = 0;
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
-// ── Browser-realistic headers ────────────────────────────────────────────────
+// ── Browser-realistic headers + cookie-ish handling ─────────────────────────
 // Rotate through multiple UAs to avoid bot detection on cloud hosts (Render etc.)
 const USER_AGENTS = [
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -18,52 +18,156 @@ const USER_AGENTS = [
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
 ];
 
+const ACCEPTS = [
+  "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+  "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+  "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+];
+
+const LANGS = [
+  "en-US,en;q=0.9",
+  "en-GB,en;q=0.9",
+  "en-US,en;q=0.8,es;q=0.3",
+];
+
+const REFERRERS = [
+  "https://www.tennisabstract.com/",
+  "https://tennisabstract.com/",
+  "https://www.tennisabstract.com/reports/",
+];
+
 function randomUA() {
   return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
 }
 
-function buildHeaders() {
+function rand(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// Minimal cookie jar: store Set-Cookie values and send Cookie back next request.
+// (No tough-cookie dependency in this repo.)
+let cookieJar = "";
+
+function buildHeaders(url) {
+  const referer = rand(REFERRERS);
   return {
     "User-Agent": randomUA(),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9",
+    Accept: rand(ACCEPTS),
+    "Accept-Language": rand(LANGS),
     "Accept-Encoding": "gzip, deflate, br",
-    "Connection": "keep-alive",
+    Connection: "keep-alive",
     "Cache-Control": "no-cache",
-    "Pragma": "no-cache",
+    Pragma: "no-cache",
     "Upgrade-Insecure-Requests": "1",
-    "Referer": "https://www.tennisabstract.com/",
+    Referer: referer,
+    ...(cookieJar ? { Cookie: cookieJar } : {}),
+    // Sometimes helps reduce bot heuristics
+    ...(url && url.includes("atp") ? { "Sec-Fetch-Site": "same-origin" } : {}),
   };
+}
+
+function updateCookieJar(setCookie) {
+  // axios flattens Set-Cookie as an array sometimes, but not always.
+  if (!setCookie) return;
+  const arr = Array.isArray(setCookie) ? setCookie : [setCookie];
+  // Keep only name=value parts; strip attributes.
+  const cookies = arr
+    .map(c => (c || "").split(";")[0]?.trim())
+    .filter(Boolean);
+  if (!cookies.length) return;
+  // Merge with existing jar by overwriting by cookie name.
+  const jarParts = cookieJar
+    ? cookieJar.split(";").map(s => s.trim()).filter(Boolean)
+    : [];
+  const jarMap = new Map(jarParts.map(p => {
+    const [k, ...rest] = p.split("=");
+    return [k, rest.join("=")];
+  }));
+
+  for (const c of cookies) {
+    const [k, ...rest] = c.split("=");
+    if (k) jarMap.set(k, rest.join("="));
+  }
+  cookieJar = Array.from(jarMap.entries())
+    .map(([k, v]) => `${k}=${v}`)
+    .join("; ");
+}
+
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+function randomDelayBetweenRetries(attempt) {
+  // 0.8s..1.6s base plus small jitter scaled by attempt
+  const base = 800 + Math.random() * 800;
+  const extra = (attempt - 1) * (400 + Math.random() * 400);
+  return Math.round(base + extra);
+}
+
+function truncateForLog(s, max = 1200) {
+  if (!s) return "";
+  const str = typeof s === "string" ? s : JSON.stringify(s);
+  return str.length > max ? str.slice(0, max) + "…" : str;
 }
 
 /**
  * Fetch a URL with automatic retry on failure.
+ * Also captures/debugs blocked HTML bodies (Render often gets 403).
  * @param {string} url
  * @param {number} retries
+ * @param {string=} context
  * @returns {Promise<AxiosResponse>}
  */
-async function fetchWithRetry(url, retries = 3) {
+async function fetchWithRetry(url, retries = 4, context = "") {
   let lastErr;
+
   for (let attempt = 1; attempt <= retries; attempt++) {
+    const headers = buildHeaders(url);
     try {
       const res = await axios.get(url, {
-        headers: buildHeaders(),
-        timeout: 20000,
+        headers,
+        timeout: 25000,
         maxRedirects: 5,
+        // axios follows redirects; keep cookies via our jar
+        validateStatus: (status) => status >= 200 && status < 400,
       });
+
+      // Capture cookies
+      try {
+        const setCookie = res.headers && (res.headers["set-cookie"] || res.headers["Set-Cookie"]);
+        if (setCookie) updateCookieJar(setCookie);
+      } catch (_) { }
+
       return res;
     } catch (err) {
       lastErr = err;
       const status = err?.response?.status;
-      console.warn(`[SearchScraper] Attempt ${attempt}/${retries} failed for ${url}: ${err.message} (HTTP ${status || "N/A"})`);
+      const data = err?.response?.data;
+
+      const bodyPreview = truncateForLog(data && (typeof data === "string" ? data : data?.toString?.()), 1500);
+
+      console.warn(
+        `[SearchScraper] Attempt ${attempt}/${retries} failed${context ? ` (${context})` : ""} for ${url}: ${err.message} (HTTP ${status || "N/A"})`
+      );
+
+      if (status === 403 || status === 429 || bodyPreview) {
+        console.warn(`[SearchScraper] Failure body preview (truncated): ${bodyPreview}`);
+      }
+
+      // rotate cookies a bit on hard blocks
+      if (status === 403 || status === 429) {
+        cookieJar = cookieJar ? cookieJar.split("; ").slice(0, 2).join("; ") : "";
+      }
+
       if (attempt < retries) {
-        // Exponential backoff: 1s, 2s, 4s
-        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
+        await sleep(randomDelayBetweenRetries(attempt));
       }
     }
   }
+
   throw lastErr;
 }
+
 
 /**
  * Scrape a Tennis Abstract Elo ratings page and extract all player links.
@@ -71,10 +175,12 @@ async function fetchWithRetry(url, retries = 3) {
  * @param {"ATP"|"WTA"} tour
  * @returns {Promise<{name:string, url:string, tour:string}[]>}
  */
-async function scrapeEloPage(url, tour) {
+async function scrapeEloPage(url, tour, opts = {}) {
   try {
+    const context = opts.context || tour;
     console.log(`[SearchScraper] Fetching ${tour} player list from ${url}`);
-    const res = await fetchWithRetry(url);
+    const res = await fetchWithRetry(url, 4, context);
+
 
     // Detect blocked / empty responses (some hosts serve a 200 with empty/error HTML)
     const bodyLen = (res.data || "").length;
@@ -131,25 +237,47 @@ async function refreshCache() {
 
   console.log("[SearchScraper] Refreshing full player cache…");
 
-  const [atp, wta] = await Promise.all([
-    scrapeEloPage("https://tennisabstract.com/reports/atp_elo_ratings.html", "ATP"),
-    scrapeEloPage("https://tennisabstract.com/reports/wta_elo_ratings.html", "WTA"),
-  ]);
+  let atp = [];
+  let wta = [];
+
+  // Preserve stale cache independently: if ATP fails due to 403 but WTA works,
+  // we still want to return partial results rather than clearing everything.
+  try {
+    atp = await scrapeEloPage(
+      "https://tennisabstract.com/reports/atp_elo_ratings.html",
+      "ATP",
+      { context: "ATP" }
+    );
+  } catch (e) {
+    atp = [];
+  }
+
+  try {
+    wta = await scrapeEloPage(
+      "https://tennisabstract.com/reports/wta_elo_ratings.html",
+      "WTA",
+      { context: "WTA" }
+    );
+  } catch (e) {
+    wta = [];
+  }
 
   const combined = [...atp, ...wta];
 
   if (combined.length > 0) {
     playerCache = combined;
     lastCacheTime = Date.now();
-    console.log(`[SearchScraper] Cache populated with ${playerCache.length} players`);
+    console.log(`[SearchScraper] Cache populated with ${playerCache.length} players (ATP=${atp.length}, WTA=${wta.length})`);
   } else {
     // Keep the stale cache rather than wiping it — better to serve old data than nothing.
     if (playerCache.length > 0) {
-      console.warn("[SearchScraper] Scrape failed — keeping stale cache of " + playerCache.length + " players.");
+      console.warn(
+        `[SearchScraper] Refresh failed — keeping stale cache of ${playerCache.length} players (ATP=${atp.length}, WTA=${wta.length}).`
+      );
       // Reset lastCacheTime so we retry on next request (don't serve stale data forever)
       lastCacheTime = now - CACHE_TTL_MS + 60_000; // retry in 1 minute
     } else {
-      console.error("[SearchScraper] Scrape failed and cache is empty. Search will return no results.");
+      console.error("[SearchScraper] Refresh failed and cache is empty. Search will return no results.");
       lastCacheTime = now; // avoid tight retry loop
     }
   }
