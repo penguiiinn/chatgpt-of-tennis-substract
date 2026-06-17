@@ -9,6 +9,30 @@ let playerCache = [];
 let lastCacheTime = 0;
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
+// Fallback static players when external scraping fails
+const STATIC_PLAYERS = [
+  { name: "Novak Djokovic", url: "https://www.tennisabstract.com/cgi-bin/player.cgi?p=NovakDjokovic", tour: "ATP" },
+  { name: "Carlos Alcaraz", url: "https://www.tennisabstract.com/cgi-bin/player.cgi?p=CarlosAlcaraz", tour: "ATP" },
+  { name: "Jannik Sinner", url: "https://www.tennisabstract.com/cgi-bin/player.cgi?p=JannikSinner", tour: "ATP" },
+  { name: "Daniil Medvedev", url: "https://www.tennisabstract.com/cgi-bin/player.cgi?p=DaniilMedvedev", tour: "ATP" },
+  { name: "Alexander Zverev", url: "https://www.tennisabstract.com/cgi-bin/player.cgi?p=AlexanderZverev", tour: "ATP" },
+  { name: "Taylor Fritz", url: "https://www.tennisabstract.com/cgi-bin/player.cgi?p=TaylorFritz", tour: "ATP" },
+  { name: "Holger Rune", url: "https://www.tennisabstract.com/cgi-bin/player.cgi?p=HolgerRune", tour: "ATP" },
+  { name: "Casper Ruud", url: "https://www.tennisabstract.com/cgi-bin/player.cgi?p=CasperRuud", tour: "ATP" },
+  { name: "Andrey Rublev", url: "https://www.tennisabstract.com/cgi-bin/player.cgi?p=AndreyRublev", tour: "ATP" },
+  { name: "Grigor Dimitrov", url: "https://www.tennisabstract.com/cgi-bin/player.cgi?p=GrigorDimitrov", tour: "ATP" },
+  { name: "Iga Świątek", url: "https://www.tennisabstract.com/cgi-bin/player.cgi?p=IgaSwiatek", tour: "WTA" },
+  { name: "Coco Gauff", url: "https://www.tennisabstract.com/cgi-bin/player.cgi?p=CocoGauff", tour: "WTA" },
+  { name: "Aryna Sabalenka", url: "https://www.tennisabstract.com/cgi-bin/player.cgi?p=ArynaSabalenka", tour: "WTA" },
+  { name: "Elena Rybakina", url: "https://www.tennisabstract.com/cgi-bin/player.cgi?p=ElenaRybakina", tour: "WTA" },
+  { name: "Jessica Pegula", url: "https://www.tennisabstract.com/cgi-bin/player.cgi?p=JessicaPegula", tour: "WTA" },
+  { name: "Jasmine Paolini", url: "https://www.tennisabstract.com/cgi-bin/player.cgi?p=JasminePaolini", tour: "WTA" },
+  { name: "Marketa Vondrousova", url: "https://www.tennisabstract.com/cgi-bin/player.cgi?p=MarketaVondrousova", tour: "WTA" },
+  { name: "Maria Sakkari", url: "https://www.tennisabstract.com/cgi-bin/player.cgi?p=MariaSakkari", tour: "WTA" },
+  { name: "Anna Blinkova", url: "https://www.tennisabstract.com/cgi-bin/player.cgi?p=AnnaBlinkova", tour: "WTA" },
+  { name: " Qinwen Zheng", url: "https://www.tennisabstract.com/cgi-bin/player.cgi?p=ZhengQinwen", tour: "WTA" }
+];
+
 // ── Browser-realistic headers + cookie-ish handling ─────────────────────────
 // Rotate through multiple UAs to avoid bot detection on cloud hosts (Render etc.)
 const USER_AGENTS = [
@@ -321,17 +345,17 @@ async function searchPlayers(query, limit = 20) {
 
   if (!query || !query.trim()) return [];
 
-  // If cache is still empty after refresh, log a clear diagnostic and return empty
+  // Use static players as fallback when cache is empty
+  const cacheSource = (playerCache && playerCache.length > 0) ? playerCache : STATIC_PLAYERS;
   if (!playerCache || playerCache.length === 0) {
-    console.error("[SearchScraper] Player cache is empty — Tennis Abstract may be blocking requests from this host.");
-    return [];
+    console.warn("[SearchScraper] Cache empty — using static fallback players");
   }
 
   const q = query.trim().toLowerCase();
-  console.log(`[SearchScraper] Searching for: "${query}" in ${playerCache.length} cached players`);
+  console.log(`[SearchScraper] Searching for: "${query}" in ${cacheSource.length} cached players`);
 
   // Score-based ranking: exact match > starts-with > includes
-  const resultsWithScore = playerCache
+  const resultsWithScore = cacheSource
     .map(p => {
       const lower = p.name.toLowerCase();
       let score = 0;
