@@ -3,7 +3,9 @@
    ═══════════════════════════════════════════ */
 
 // ─── API Config & State ─────────────────
-const API_BASE = "https://aceintel-backend.onrender.com";
+const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+  ? "http://127.0.0.1:5000"
+  : "https://aceintel-backend.onrender.com";
 let p1Key = null, p2Key = null;
 let playersList = [];
 
@@ -831,6 +833,13 @@ function renderPredictNew(pa, pb, mi) {
 
   const confCls = mi.confidence.toLowerCase() === "high" ? "confidence-high" : mi.confidence.toLowerCase() === "medium" ? "confidence-medium" : "confidence-low";
 
+  const edges = mi.edges || {
+    surfaceEdge: "Neutral / Insufficient Data",
+    recentFormEdge: "Neutral / Insufficient Data",
+    historicalEdge: "Neutral / Insufficient Data",
+    h2hEdge: "Neutral / Insufficient Data"
+  };
+
   const advantagesHtml = mi.advantages.map(a => `
     <li class="prob-reason" style="display:flex;align-items:flex-start;gap:8px;margin-bottom:10px;">
       <span style="color:var(--green);font-weight:bold;margin-top:1px;">✓</span>
@@ -886,6 +895,43 @@ function renderPredictNew(pa, pb, mi) {
         <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:0.85rem;margin-top:6px;font-weight:700;">
           <span class="p1c" style="color:var(--accent-hover);">${fillPctL}%</span>
           <span class="p2c" style="color:var(--cyan);">${fillPctR}%</span>
+        </div>
+      </div>
+
+      <!-- Key Advantage Breakdown -->
+      <div class="key-advantages-breakdown reveal" style="margin-bottom: 32px; padding: 20px; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-lg);">
+        <h4 style="font-size:0.8rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--accent); margin-top:0; margin-bottom:14px; border-bottom:1px solid var(--border); padding-bottom:6px; font-weight:700; display:flex; align-items:center; gap:6px;">
+          <span>⚡</span> Key Advantage Breakdown
+        </h4>
+        <div class="edges-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+          <!-- Surface Edge Card -->
+          <div style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 4px;">
+            <span style="font-size:0.65rem; color:var(--text-muted); text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Surface Edge</span>
+            <span style="font-size:0.85rem; color:var(--text-primary); font-weight:600; display:flex; align-items:center; gap:6px; text-align:left;">
+              <span style="color:var(--accent);">🎾</span> ${edges.surfaceEdge}
+            </span>
+          </div>
+          <!-- Recent Form Edge Card -->
+          <div style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 4px;">
+            <span style="font-size:0.65rem; color:var(--text-muted); text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Recent Form Edge</span>
+            <span style="font-size:0.85rem; color:var(--text-primary); font-weight:600; display:flex; align-items:center; gap:6px; text-align:left;">
+              <span style="color:var(--green);">📈</span> ${edges.recentFormEdge}
+            </span>
+          </div>
+          <!-- Historical Edge Card -->
+          <div style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 4px;">
+            <span style="font-size:0.65rem; color:var(--text-muted); text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Historical Edge</span>
+            <span style="font-size:0.85rem; color:var(--text-primary); font-weight:600; display:flex; align-items:center; gap:6px; text-align:left;">
+              <span style="color:var(--cyan);">⏳</span> ${edges.historicalEdge}
+            </span>
+          </div>
+          <!-- H2H Edge Card -->
+          <div style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 4px;">
+            <span style="font-size:0.65rem; color:var(--text-muted); text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">H2H Edge</span>
+            <span style="font-size:0.85rem; color:var(--text-primary); font-weight:600; display:flex; align-items:center; gap:6px; text-align:left;">
+              <span style="color:var(--accent-hover);">⚔️</span> ${edges.h2hEdge}
+            </span>
+          </div>
         </div>
       </div>
 

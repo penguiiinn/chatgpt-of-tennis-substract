@@ -46,7 +46,8 @@ const TARGET_PLAYERS_DB = {
     ytdRecord: "47-4",
     h2h: {
       "Carlos Alcaraz": { wins: 4, losses: 6, total: 10 },
-      "Novak Djokovic": { wins: 5, losses: 4, total: 9 }
+      "Novak Djokovic": { wins: 5, losses: 4, total: 9 },
+      "Daniil Medvedev": { wins: 8, losses: 3, total: 11 }
     },
     surfaceStats: {
       hard: { winPct: 88.0, wins: 53, losses: 7, strength: "Elite" },
@@ -123,8 +124,30 @@ const TARGET_PLAYERS_DB = {
       clay: { winPct: 63.0, wins: 18, losses: 11, strength: "Average" },
       grass: { winPct: 50.0, wins: 1, losses: 1, strength: "Average" }
     },
+  },
+  "daniil medvedev": {
+    name: "Daniil Medvedev",
+    rank: 5,
+    peakRank: 1,
+    age: 30,
+    country: "Russia",
+    handedness: "Right-Handed (Two-Handed Backhand)",
+    elo: 2040,
+    careerWinPct: 70.6,
+    recentForm: ["W", "L", "W", "W", "W", "L", "W", "W", "L", "W"],
+    ytdRecord: "30-10",
+    h2h: {
+      "Jannik Sinner": { wins: 3, losses: 8, total: 11 },
+      "Carlos Alcaraz": { wins: 2, losses: 6, total: 8 },
+      "Novak Djokovic": { wins: 20, losses: 21, total: 41 }
+    },
+    surfaceStats: {
+      hard: { winPct: 75.0, wins: 180, losses: 60, strength: "Elite" },
+      clay: { winPct: 45.0, wins: 30, losses: 36, strength: "Average" },
+      grass: { winPct: 65.0, wins: 35, losses: 19, strength: "Strong" }
+    },
     recentMatches: [
-      { opponent: "Tyra Caterina Grant", surface: "Clay", result: "loss", score: "4-6 3-6", tournament: "WTA Prerov", date: "2026-05-15" }
+      { opponent: "Jannik Sinner", surface: "Clay", result: "loss", score: "2-6 4-6 5-7", tournament: "Roland Garros SF", date: "2026-06-06" }
     ]
   }
 };
