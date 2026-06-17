@@ -1,0 +1,8 @@
+{
+  "name": "realonlineruler",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "cd backend && node server.js",
+    "dev": "cd backend && nodemon server.js"
+  }
+}

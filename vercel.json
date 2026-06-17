@@ -1,0 +1,8 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "aceintel",
+  "framework": null,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/aceintel/index.html" }
+  ]
+}
