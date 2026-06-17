@@ -3,9 +3,7 @@
    ═══════════════════════════════════════════ */
 
 // ─── API Config & State ─────────────────
-const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-  ? "http://127.0.0.1:5000"
-  : "https://aceintel-backend.onrender.com";
+const API_BASE = "https://aceintel-backend.onrender.com";
 let p1Key = null, p2Key = null;
 let playersList = [];
 
