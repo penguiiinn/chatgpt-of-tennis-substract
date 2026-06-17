@@ -345,17 +345,17 @@ async function searchPlayers(query, limit = 20) {
 
   if (!query || !query.trim()) return [];
 
-  // Use static players as fallback when cache is empty
-  const cacheSource = (playerCache && playerCache.length > 0) ? playerCache : STATIC_PLAYERS;
+  // Always supplement cache with static players to ensure top players are included
+  const combinedCache = [...(playerCache || []), ...STATIC_PLAYERS];
   if (!playerCache || playerCache.length === 0) {
     console.warn("[SearchScraper] Cache empty — using static fallback players");
   }
 
   const q = query.trim().toLowerCase();
-  console.log(`[SearchScraper] Searching for: "${query}" in ${cacheSource.length} cached players`);
+  console.log(`[SearchScraper] Searching for: "${query}" in ${combinedCache.length} cached players`);
 
   // Score-based ranking: exact match > starts-with > includes
-  const resultsWithScore = cacheSource
+  const resultsWithScore = combinedCache
     .map(p => {
       const lower = p.name.toLowerCase();
       let score = 0;
