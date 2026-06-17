@@ -49,7 +49,10 @@
       "Bash(curl -s \"https://aceintel-backend.onrender.com/predictions/Novak%20Djokovic/Carlos%20Alcaraz\")",
       "Bash(curl -s \"https://aceintel-backend.onrender.com/api/predictions/Novak%20Djokovic/Carlos%20Alcaraz\")",
       "Bash(git add aceintel/Trending.html aceintel/h2h.js)",
-      "Bash(git commit -m \"fix: use production API_BASE in h2h.js and Trending.html:*)"
+      "Bash(git commit -m \"fix: use production API_BASE in h2h.js and Trending.html:*)",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/search?name=sinn&limit=10\")",
+      "Bash(git commit -m \"fix: deduplicate search results by name+tour:*)",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/search?name=alcaraz&limit=10\")"
     ]
   }
 }
