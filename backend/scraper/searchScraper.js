@@ -351,11 +351,25 @@ async function searchPlayers(query, limit = 20) {
     console.warn("[SearchScraper] Cache empty — using static fallback players");
   }
 
+  // Deduplicate by name+tour, keeping record with most complete data
+  const dedupedMap = new Map();
+  for (const p of combinedCache) {
+    const key = `${p.name}|${p.tour}`;
+    const existing = dedupedMap.get(key);
+    // Prefer record with more populated fields (elo, rank, age indicate more complete data)
+    const scoreA = existing ? (existing.elo ? 1 : 0) + (existing.rank ? 1 : 0) + (existing.age ? 1 : 0) : 0;
+    const scoreB = (p.elo ? 1 : 0) + (p.rank ? 1 : 0) + (p.age ? 1 : 0);
+    if (!existing || scoreB > scoreA) {
+      dedupedMap.set(key, p);
+    }
+  }
+  const dedupedCache = Array.from(dedupedMap.values());
+
   const q = query.trim().toLowerCase();
-  console.log(`[SearchScraper] Searching for: "${query}" in ${combinedCache.length} cached players`);
+  console.log(`[SearchScraper] Searching for: "${query}" in ${dedupedCache.length} cached players`);
 
   // Score-based ranking: exact match > starts-with > includes
-  const resultsWithScore = combinedCache
+  const resultsWithScore = dedupedCache
     .map(p => {
       const lower = p.name.toLowerCase();
       let score = 0;
