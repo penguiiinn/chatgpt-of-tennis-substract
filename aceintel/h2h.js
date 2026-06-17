@@ -214,10 +214,39 @@ function initSelector() {
 }
 
 // ═══════════════════════════════════════
+// RESOLVE SLUG TO FULL NAME (share with homepage search)
+// ═══════════════════════════════════════
+async function resolveSlugToName(slug) {
+  // If already has space, assume full name
+  if (slug.includes(" ")) return slug;
+
+  try {
+    const url = `${API_BASE}/api/search?name=${encodeURIComponent(slug)}&limit=5`;
+    const res = await fetch(url);
+    if (!res.ok) return slug;
+    const matches = await res.json();
+
+    // Find best match: exact match first, then partial match
+    const best = matches.find(m => m.name.toLowerCase() === slug.toLowerCase())
+      || matches.find(m => m.name.toLowerCase().includes(slug.toLowerCase()))
+      || matches[0];
+    return best ? best.name : slug;
+  } catch (e) {
+    console.warn("Failed to resolve slug:", slug, e);
+    return slug;
+  }
+}
+
+// ═══════════════════════════════════════
 // BUILD FULL REPORT
 // ═══════════════════════════════════════
 async function buildReport(a, b) {
-  p1Key = a; p2Key = b;
+  // Resolve slugs to full names (like homepage does)
+  const [nameA, nameB] = await Promise.all([
+    resolveSlugToName(a),
+    resolveSlugToName(b)
+  ]);
+  p1Key = nameA; p2Key = nameB;
 
   const report = $("#h2h-report");
   report.classList.remove("hidden");
@@ -225,8 +254,9 @@ async function buildReport(a, b) {
   let data = null;
   let matchupIntel = null;
   try {
-    const url1 = `${API_BASE}/api/h2h?p1=${encodeURIComponent(a)}&p2=${encodeURIComponent(b)}`;
-    const url2 = `${API_BASE}/api/matchup/${encodeURIComponent(a)}/${encodeURIComponent(b)}`;
+    // Use resolved full names for API calls
+    const url1 = `${API_BASE}/api/h2h?p1=${encodeURIComponent(nameA)}&p2=${encodeURIComponent(nameB)}`;
+    const url2 = `${API_BASE}/api/matchup/${encodeURIComponent(nameA)}/${encodeURIComponent(nameB)}`;
     console.log("API URL being called:", url1);
     console.log("API URL being called:", url2);
 
