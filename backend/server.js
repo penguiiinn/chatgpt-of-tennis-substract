@@ -19,6 +19,8 @@ const predictionEngineRoutes = require("./routes/predictionRoutes");
 const bettingRoutes = require("./routes/bettingRoutes");
 // Step 8 — Tournament Mode
 const tournamentRoutes = require("./routes/tournamentRoutes");
+const historyRoutes = require("./routes/historyRoutes");
+const { initStore } = require("./history/historicalStore");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -49,6 +51,7 @@ app.use("/api/prediction", predictionEngineRoutes);
 app.use("/api/betting", bettingRoutes);
 // Step 8 — Tournament Mode
 app.use("/api/tournament", tournamentRoutes);
+app.use("/api/history", historyRoutes);
 
 
 // Error Handling Middleware
@@ -65,4 +68,8 @@ app.listen(PORT, () => {
   console.log(`[AceIntel Server] Running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT} `);
   // Pre-warm the Tennis Abstract player cache
   warmCache();
+  // Warm the historical data store index (async, non-blocking)
+  initStore().catch(err => {
+    console.error("[AceIntel Server] Failed to warm historical database on startup:", err.message);
+  });
 });
