@@ -12,7 +12,8 @@
       "Bash(node -e \"const { getPlayerProfile } = require\\(''./backend/services/playerService''\\); getPlayerProfile\\(''Novak Djokovic''\\).then\\(p => console.log\\(''Got:'', p ? p.overview.name : ''null''\\)\\).catch\\(e => console.log\\(''Error:'', e.message\\)\\);\")",
       "Bash(node -e \"const keys = [''Anna Blinkova'', ''Carlos Alcaraz'', ''Iga Swiatek'', ''Jannik Sinner'', ''Novak Djokovic'', ''Daniil Medvedev'']; const t = ''djokovic''; const m = keys.find\\(k => k.toLowerCase\\(\\).includes\\(t\\)\\); console.log\\(''includes check:'', t, ''in'', m\\);\")",
       "Bash(node -e \"const { PROFILE_DB } = require\\(''./backend/data/db''\\); const keys = Object.keys\\(PROFILE_DB\\); const t = ''djokovic''; const r = keys.find\\(k => k.toLowerCase\\(\\).includes\\(t\\)\\); console.log\\(''keys:'', keys\\); console.log\\(''find djokovic:'', r\\);\")",
-      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/search?name=djokovic&limit=5\")"
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/search?name=djokovic&limit=5\")",
+      "Bash(node -e \"const { predictMatch } = require\\(''./backend/services/aiPredictorService''\\); const { initStore } = require\\(''./backend/history/historicalStore''\\); \\(async \\(\\) => { await initStore\\(\\); const r = await predictMatch\\(''Novak Djokovic'', ''Carlos Alcaraz'', ''hard''\\); console.log\\(''edges:'', r.edges\\); }\\)\\(\\).catch\\(console.error\\);\")"
     ]
   }
 }

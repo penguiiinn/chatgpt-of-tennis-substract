@@ -2,17 +2,35 @@ const { getDb, initStore, getPlayerMatches, getPlayerSurfaceStats, getPlayerH2H 
 const { getLivePlayerProfile } = require("../scraper/multiSourceScraper");
 const { PLAYERS_DB } = require("../data/db");
 
-// Factor weights (must sum to 1.0)
+// Factor weights (must sum to 1.0) - Updated per task requirements
 const WEIGHTS = {
-  historicalForm:   0.10,
-  recent10:         0.15,
-  surface:          0.15,
-  h2h:              0.15,
-  ranking:          0.10,
-  elo:              0.15,
-  oppStrength:      0.10,
-  momentum:         0.05,
-  tournamentWeight: 0.05
+  // Task requirement: Elo (20%), Recent form (25%), Historical (25%), Surface (15%), H2H (15%)
+  elo:              0.20,
+  recentForm:       0.25,
+  historical:      0.25,
+  surface:         0.15,
+  h2h:            0.15
+};
+
+// Time-weighted form: Last 3 months = 40%, Last 12 months = 35%, Older = 25%
+const TIME_WEIGHTS = {
+  last3Months:  0.40,
+  last12Months: 0.35,
+  older:       0.25
+};
+
+// Tournament importance multipliers
+const TOURNAMENT_WEIGHTS = {
+  "grand slam": 1.5,
+  "wimbledon": 1.5,
+  "roland garros": 1.5,
+  "us open": 1.5,
+  "australian open": 1.5,
+  "masters": 1.3,
+  "atp finals": 1.3,
+  "1000": 1.3,
+  "500": 1.15,
+  "250": 1.0
 };
 
 /**
@@ -75,35 +93,102 @@ async function predictMatch(player1Name, player2Name, surface = "hard") {
 
   let missingFactorsCount = 0;
 
-  // ── Calculate Factor 1: Historical form (last 6-7 years) ──
+  // ── Calculate Factor 1: Time-weighted Historical form (last 6-7 years) ──
+  // Time weights: Last 3 months = 40%, Last 12 months = 35%, Older = 25%
   let p1HistMatches = getPlayerMatches(p1.name);
   let p2HistMatches = getPlayerMatches(p2.name);
 
-  const getHistWinRate = (matches) => {
+  const getTimeWeightedHistWinRate = (matches) => {
     if (!matches) {
       missingFactorsCount++;
       return null;
     }
-    let wins = 0;
-    let total = 0;
+
+    const now = new Date();
+    const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const twelveMonthsAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+
+    let wins3mo = 0, total3mo = 0;
+    let wins12mo = 0, total12mo = 0;
+    let winsOlder = 0, totalOlder = 0;
+
     Object.keys(matches).forEach(year => {
       matches[year].forEach(m => {
-        total++;
-        if (m.result === "W") wins++;
+        const matchDate = m.matchDate ? new Date(m.matchDate) : null;
+        const isWin = m.result === "W";
+
+        if (matchDate && matchDate >= threeMonthsAgo) {
+          total3mo++;
+          if (isWin) wins3mo++;
+        } else if (matchDate && matchDate >= twelveMonthsAgo) {
+          total12mo++;
+          if (isWin) wins12mo++;
+        } else {
+          // Older matches - also count year-level matches without dates
+          totalOlder++;
+          if (isWin) winsOlder++;
+        }
       });
     });
-    return total > 0 ? (wins / total) * 100 : null;
+
+    // Calculate weighted percentages
+    const pct3mo = total3mo > 0 ? (wins3mo / total3mo) * 100 : 50;
+    const pct12mo = total12mo > 0 ? (wins12mo / total12mo) * 100 : 50;
+    const pctOlder = totalOlder > 0 ? (winsOlder / totalOlder) * 100 : 50;
+
+    // Apply time weights
+    const weightedScore = (
+      TIME_WEIGHTS.last3Months * pct3mo +
+      TIME_WEIGHTS.last12Months * pct12mo +
+      TIME_WEIGHTS.older * pctOlder
+    );
+
+    return weightedScore;
   };
 
-  let p1HistWinPct = getHistWinRate(p1HistMatches);
-  let p2HistWinPct = getHistWinRate(p2HistMatches);
+  const getTournamentWeightedHistWinRate = (matches) => {
+    // Calculate win rate with tournament importance weighting
+    if (!matches) return 50;
+    let weightedWins = 0;
+    let weightedTotal = 0;
+
+    Object.keys(matches).forEach(year => {
+      matches[year].forEach(m => {
+        let weight = 1.0;
+        const tourney = (m.tournament || "").toLowerCase();
+
+        // Match tournament name against weights
+        for (const [key, val] of Object.entries(TOURNAMENT_WEIGHTS)) {
+          if (tourney.includes(key)) {
+            weight = val;
+            break;
+          }
+        }
+
+        weightedTotal += weight;
+        if (m.result === "W") {
+          weightedWins += weight;
+        }
+      });
+    });
+
+    return weightedTotal > 0 ? (weightedWins / weightedTotal) * 100 : 50;
+  };
+
+  let p1HistWinPct = getTimeWeightedHistWinRate(p1HistMatches);
+  let p2HistWinPct = getTimeWeightedHistWinRate(p2HistMatches);
+
+  let p1TourneyWeightedWinPct = getTournamentWeightedHistWinRate(p1HistMatches);
+  let p2TourneyWeightedWinPct = getTournamentWeightedHistWinRate(p2HistMatches);
 
   // Fallback to career win pct if no historical matches exist
   if (p1HistWinPct === null) {
     p1HistWinPct = isValid(p1.careerWinPct) ? Number(p1.careerWinPct) : 50;
+    p1TourneyWeightedWinPct = p1HistWinPct;
   }
   if (p2HistWinPct === null) {
     p2HistWinPct = isValid(p2.careerWinPct) ? Number(p2.careerWinPct) : 50;
+    p2TourneyWeightedWinPct = p2HistWinPct;
   }
 
   // ── Calculate Factor 2: Recent 10 matches ──
@@ -157,15 +242,37 @@ async function predictMatch(player1Name, player2Name, surface = "hard") {
   const p1SurfaceWinPct = getSurfaceWinPct(p1.name, p1, normSurface);
   const p2SurfaceWinPct = getSurfaceWinPct(p2.name, p2, normSurface);
 
-  // ── Calculate Factor 4: H2H history ──
+  // ── Calculate Factor 4: H2H history with surface-specific and time weighting ──
   let p1Wins = 0;
   let p2Wins = 0;
+  let p1SurfaceWins = 0;
+  let p2SurfaceWins = 0;
+  let recentH2HWeight = 0; // Weight recent meetings more
 
-  // Check historical H2H
+  // Check historical H2H with surface breakdown
   const histH2H = getPlayerH2H(p1.name, p2.name);
-  if (histH2H && histH2H.record) {
-    p1Wins += histH2H.record.wins;
-    p2Wins += histH2H.record.losses;
+  if (histH2H && histH2H.matches) {
+    histH2H.matches.forEach((m, idx) => {
+      const isP1Winner = m.result === "W";
+      const isSurfaceMatch = m.surface && m.surface.toLowerCase() === normSurface;
+
+      // Count all H2H
+      if (isP1Winner) p1Wins++; else p2Wins++;
+
+      // Count surface-specific H2H
+      if (isSurfaceMatch) {
+        if (isP1Winner) p1SurfaceWins++; else p2SurfaceWins++;
+      }
+
+      // Weight recent meetings (last 2 years get 2x weight)
+      const matchDate = m.matchDate ? new Date(m.matchDate) : null;
+      const twoYearsAgo = new Date(Date.now() - 730 * 24 * 60 * 60 * 1000);
+      if (matchDate && matchDate >= twoYearsAgo) {
+        recentH2HWeight += 0.5; // Additional weight for recent
+      }
+    });
+    // Add baseline weight for historical matches
+    recentH2HWeight += Math.min(histH2H.matches.length * 0.5, 2);
   }
 
   // Check live H2H
@@ -195,11 +302,54 @@ async function predictMatch(player1Name, player2Name, surface = "hard") {
   }
 
   let p1H2HWinPct = 50;
+  let p1SurfaceH2HPct = 50;
+
+  // Calculate overall H2H with time weighting
   if (p1Wins > 0 || p2Wins > 0) {
     p1H2HWinPct = (p1Wins / (p1Wins + p2Wins)) * 100;
+    // Apply recent meeting bonus (up to +10%)
+    p1H2HWinPct = Math.min(95, p1H2HWinPct + (recentH2HWeight * 5));
   } else {
     missingFactorsCount++;
   }
+
+  // Calculate surface-specific H2H
+  const surfaceTotal = p1SurfaceWins + p2SurfaceWins;
+  if (surfaceTotal > 0) {
+    p1SurfaceH2HPct = (p1SurfaceWins / surfaceTotal) * 100;
+  } else {
+    // Fallback to overall surface win rate if no surface-specific H2H
+    p1SurfaceH2HPct = p1SurfaceWinPct;
+  }
+
+  // ── Calculate Factor 5: Performance vs Top 10/20/50 from historical ──
+  const getTopPerformance = (matches) => {
+    if (!matches) return { top10: 50, top20: 50, top50: 50 };
+
+    let t10w = 0, t10t = 0;
+    let t20w = 0, t20t = 0;
+    let t50w = 0, t50t = 0;
+
+    Object.keys(matches).forEach(year => {
+      matches[year].forEach(m => {
+        const rank = m.opponentRanking;
+        if (rank !== null && rank !== undefined) {
+          if (rank <= 10) { t10t++; if (m.result === "W") t10w++; }
+          if (rank <= 20) { t20t++; if (m.result === "W") t20w++; }
+          if (rank <= 50) { t50t++; if (m.result === "W") t50w++; }
+        }
+      });
+    });
+
+    return {
+      top10: t10t > 0 ? (t10w / t10t) * 100 : 50,
+      top20: t20t > 0 ? (t20w / t20t) * 100 : 50,
+      top50: t50t > 0 ? (t50w / t50t) * 100 : 50
+    };
+  };
+
+  const p1TopPerf = getTopPerformance(p1HistMatches);
+  const p2TopPerf = getTopPerformance(p2HistMatches);
 
   // ── Calculate Factor 5: ATP ranking ──
   const getRankScore = (player) => {
@@ -342,33 +492,27 @@ async function predictMatch(player1Name, player2Name, surface = "hard") {
   const p1Inactivity = checkInactivity(p1);
   const p2Inactivity = checkInactivity(p2);
 
-  // ── Compute Weighted Composite Scores ──
-  const calcComposite = (hist, rec, surf, h2h, rank, elo, opp, mom, tWeight, inactPenalty) => {
-    let score = (
-      WEIGHTS.historicalForm   * hist +
-      WEIGHTS.recent10         * rec +
-      WEIGHTS.surface          * surf +
-      WEIGHTS.h2h              * h2h +
-      WEIGHTS.ranking          * rank +
-      WEIGHTS.elo              * elo +
-      WEIGHTS.oppStrength      * opp +
-      WEIGHTS.momentum         * mom +
-      WEIGHTS.tournamentWeight * tWeight
-    );
-    // Apply injury/inactivity penalty
-    score -= inactPenalty;
-    return score;
-  };
+  // ── Compute Weighted Composite Scores using 5 required factors ──
+  // Use: Elo (20%), Recent form (25%), Historical (25%), Surface (15%), H2H (15%)
+  // Combine time-weighted historical with tournament-weighted for final historical factor
+  const p1CombinedHistorical = (p1HistWinPct * 0.6) + (p1TourneyWeightedWinPct * 0.4);
+  const p2CombinedHistorical = (p2HistWinPct * 0.6) + (p2TourneyWeightedWinPct * 0.4);
 
-  const p1Composite = calcComposite(
-    p1HistWinPct, p1RecentWinPct, p1SurfaceWinPct, p1H2HWinPct,
-    p1RankScore, p1EloScore, p1OppStrength, p1Momentum, p1WeightedHistWinPct,
+  const p1Composite = (
+    WEIGHTS.elo * p1EloScore +
+    WEIGHTS.recentForm * p1RecentWinPct +
+    WEIGHTS.historical * p1CombinedHistorical +
+    WEIGHTS.surface * p1SurfaceWinPct +
+    WEIGHTS.h2h * p1H2HWinPct -
     p1Inactivity.penalty
   );
 
-  const p2Composite = calcComposite(
-    p2HistWinPct, p2RecentWinPct, p2SurfaceWinPct, (100 - p1H2HWinPct),
-    p2RankScore, p2EloScore, p2OppStrength, p2Momentum, p2WeightedHistWinPct,
+  const p2Composite = (
+    WEIGHTS.elo * p2EloScore +
+    WEIGHTS.recentForm * p2RecentWinPct +
+    WEIGHTS.historical * p2CombinedHistorical +
+    WEIGHTS.surface * p2SurfaceWinPct +
+    WEIGHTS.h2h * (100 - p1H2HWinPct) -
     p2Inactivity.penalty
   );
 
@@ -416,21 +560,34 @@ async function predictMatch(player1Name, player2Name, surface = "hard") {
     recentFormEdge = `${p2.name} (${Math.round(p2RecentWinPct)}% vs ${Math.round(p1RecentWinPct)}% wins)`;
   }
 
-  // 3. Historical Edge
-  const histDiff = p1HistWinPct - p2HistWinPct;
+  // 3. Historical Edge - Use tournament-weighted combined historical
+  const combinedP1Hist = (p1HistWinPct * 0.6) + (p1TourneyWeightedWinPct * 0.4);
+  const combinedP2Hist = (p2HistWinPct * 0.6) + (p2TourneyWeightedWinPct * 0.4);
+  const histDiff = combinedP1Hist - combinedP2Hist;
   let historicalEdge = "Even historical performance";
   if (histDiff > 1.5) {
-    historicalEdge = `${p1.name} (+${histDiff.toFixed(1)}% overall historical win rate)`;
+    historicalEdge = `${p1.name} (+${histDiff.toFixed(1)}% time-weighted historical win rate)`;
   } else if (histDiff < -1.5) {
-    historicalEdge = `${p2.name} (+${Math.abs(histDiff).toFixed(1)}% overall historical win rate)`;
+    historicalEdge = `${p2.name} (+${Math.abs(histDiff).toFixed(1)}% time-weighted historical win rate)`;
   }
 
-  // 4. H2H Edge
+  // 4. H2H Edge - Include surface-specific
   let h2hEdge = `Even head-to-head record (${p1Wins}-${p2Wins})`;
   if (p1Wins > p2Wins) {
-    h2hEdge = `${p1.name} leads H2H ${p1Wins}-${p2Wins}`;
+    const recentMsg = recentH2HWeight > 0.5 ? " (recent meetings weighted)" : "";
+    h2hEdge = `${p1.name} leads H2H ${p1Wins}-${p2Wins}${recentMsg}`;
   } else if (p2Wins > p1Wins) {
-    h2hEdge = `${p2.name} leads H2H ${p2Wins}-${p1Wins}`;
+    const recentMsg = recentH2HWeight > 0.5 ? " (recent meetings weighted)" : "";
+    h2hEdge = `${p2.name} leads H2H ${p2Wins}-${p1Wins}${recentMsg}`;
+  }
+
+  // Add surface H2H edge if different from overall
+  if (p1SurfaceWins > 0 || p2SurfaceWins > 0) {
+    const surfH2HDiff = p1SurfaceH2HPct - (100 - p1SurfaceH2HPct);
+    if (Math.abs(surfH2HDiff) > 5) {
+      const surfWinner = surfH2HDiff > 0 ? p1.name : p2.name;
+      h2hEdge += ` | ${surfWinner} leads on ${surface}`;
+    }
   }
 
   // ── Advantages vs Risk Factors ──
@@ -466,6 +623,19 @@ async function predictMatch(player1Name, player2Name, surface = "hard") {
     p1Advantages.push(`Stronger recent form (${Math.round(p1RecentWinPct)}% wins vs ${Math.round(p2RecentWinPct)}%)`);
   } else if (p2RecentWinPct > p1RecentWinPct + 10) {
     p2Advantages.push(`Stronger recent form (${Math.round(p2RecentWinPct)}% wins vs ${Math.round(p1RecentWinPct)}%)`);
+  }
+
+  // Top opponent performance from historical (vs Top 10/20/50)
+  if (p1TopPerf.top10 > p2TopPerf.top10 + 10) {
+    p1Advantages.push(`Superior vs Top 10 historically (${p1TopPerf.top10.toFixed(0)}% vs ${p2TopPerf.top10.toFixed(0)}%)`);
+  } else if (p2TopPerf.top10 > p1TopPerf.top10 + 10) {
+    p2Advantages.push(`Superior vs Top 10 historically (${p2TopPerf.top10.toFixed(0)}% vs ${p1TopPerf.top10.toFixed(0)}%)`);
+  }
+
+  if (p1TopPerf.top20 > p2TopPerf.top20 + 10) {
+    p1Advantages.push(`Better vs Top 20 (${p1TopPerf.top20.toFixed(0)}% vs ${p2TopPerf.top20.toFixed(0)}%)`);
+  } else if (p2TopPerf.top20 > p1TopPerf.top20 + 10) {
+    p2Advantages.push(`Better vs Top 20 (${p2TopPerf.top20.toFixed(0)}% vs ${p1TopPerf.top20.toFixed(0)}%)`);
   }
 
   // Inactivity risk factors
@@ -512,8 +682,8 @@ async function predictMatch(player1Name, player2Name, surface = "hard") {
     keyBattle = `Direct Clash: Head-to-head familiarity is key here, as ${fav.name} tries to extend their historical ${p1Favors ? p1Wins + "-" + p2Wins : p2Wins + "-" + p1Wins} rivalry lead.`;
   }
 
-  // Ensure winner is never undefined - fallback to favorite using p1 if tied
-  const resolvedWinner = winner || p1.name || "Unknown";
+  // Ensure winner is never undefined - derive from favorite (the predicted winner)
+  const resolvedWinner = favorite || p1.name || "Unknown";
   const resolvedFavorite = favorite || p1.name || "Unknown";
 
   return {
