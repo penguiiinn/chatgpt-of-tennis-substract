@@ -15,7 +15,10 @@
       "Bash(curl -s \"https://aceintel-backend.onrender.com/api/search?name=djokovic&limit=5\")",
       "Bash(node -e \"const { predictMatch } = require\\(''./backend/services/aiPredictorService''\\); const { initStore } = require\\(''./backend/history/historicalStore''\\); \\(async \\(\\) => { await initStore\\(\\); const r = await predictMatch\\(''Novak Djokovic'', ''Carlos Alcaraz'', ''hard''\\); console.log\\(''edges:'', r.edges\\); }\\)\\(\\).catch\\(console.error\\);\")",
       "Bash(node -e \"const { getTrendingPlayers } = require\\(''./backend/services/trendingEngine''\\); const { initStore } = require\\(''./backend/history/historicalStore''\\); \\(async \\(\\) => { await initStore\\(\\); const trending = await getTrendingPlayers\\(''hard'', 5\\); console.log\\(''Top 5 trending:'', trending.map\\(p => p.name + '' - '' + p.trendScore + '' \\('' + p.label + ''\\)''\\).join\\(''\\\\n''\\)\\); }\\)\\(\\).catch\\(console.error\\);\")",
-      "Bash(node -e \"const { getTrendingPlayers } = require\\(''./backend/services/trendingEngine''\\); const { initStore } = require\\(''./backend/history/historicalStore''\\); \\(async \\(\\) => { await initStore\\(\\); const trending = await getTrendingPlayers\\(''hard'', 5\\); console.log\\(''Top trending:'', trending.map\\(p => p.name + '' '' + p.label + '' \\('' + p.trendScore + ''\\)''\\).join\\(''\\\\n''\\)\\); }\\)\\(\\).catch\\(console.error\\);\")"
+      "Bash(node -e \"const { getTrendingPlayers } = require\\(''./backend/services/trendingEngine''\\); const { initStore } = require\\(''./backend/history/historicalStore''\\); \\(async \\(\\) => { await initStore\\(\\); const trending = await getTrendingPlayers\\(''hard'', 5\\); console.log\\(''Top trending:'', trending.map\\(p => p.name + '' '' + p.label + '' \\('' + p.trendScore + ''\\)''\\).join\\(''\\\\n''\\)\\); }\\)\\(\\).catch\\(console.error\\);\")",
+      "Bash(ls -la *.json vercel.json)",
+      "Bash(git add package.json vercel.json)",
+      "Bash(git commit -m \"fix: add Vercel deployment config files:*)"
     ]
   }
 }
