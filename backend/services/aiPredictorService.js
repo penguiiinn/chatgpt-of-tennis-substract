@@ -63,8 +63,12 @@ async function predictMatch(player1Name, player2Name, surface = "hard") {
   ]);
 
   if (!profile1 || !profile1.player || !profile2 || !profile2.player) {
+    console.error("[aiPredictorService] Player profiles not resolved:", { profile1: !!profile1, profile2: !!profile2 });
     throw new Error("One or both player profiles could not be resolved.");
   }
+
+  // Debug: log profile names to verify data is loaded
+  console.log("[aiPredictorService] Resolved players:", profile1.player.name, "vs", profile2.player.name);
 
   const p1 = profile1.player;
   const p2 = profile2.player;
@@ -508,9 +512,13 @@ async function predictMatch(player1Name, player2Name, surface = "hard") {
     keyBattle = `Direct Clash: Head-to-head familiarity is key here, as ${fav.name} tries to extend their historical ${p1Favors ? p1Wins + "-" + p2Wins : p2Wins + "-" + p1Wins} rivalry lead.`;
   }
 
+  // Ensure winner is never undefined - fallback to favorite using p1 if tied
+  const resolvedWinner = winner || p1.name || "Unknown";
+  const resolvedFavorite = favorite || p1.name || "Unknown";
+
   return {
-    winner: favorite,
-    favorite,
+    winner: resolvedWinner,
+    favorite: resolvedFavorite,
     winProbability,
     confidence,
     confidencePct,

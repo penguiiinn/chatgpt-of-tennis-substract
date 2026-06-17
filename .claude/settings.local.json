@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node audit_pipeline.js)"
+      "Bash(node audit_pipeline.js)",
+      "Bash(node -e \":*)",
+      "Bash(ls -la *.js)",
+      "Bash(dir *.js)"
     ]
   }
 }
