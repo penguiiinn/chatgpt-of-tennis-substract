@@ -1,5 +1,6 @@
 const playerService = require("./playerService");
 const liveMatchService = require("./liveMatchService");
+const { getLivePlayerProfile } = require("../scraper/multiSourceScraper");
 
 async function getPlayerProfile(playerId) {
     const player = await playerService.getPlayerProfile(playerId);
@@ -14,6 +15,10 @@ async function getPlayerProfile(playerId) {
         hand: player.overview.handedness || null,
         height: player.overview.height || null
     };
+}
+
+async function getLiveProfile(playerId) {
+    return await getLivePlayerProfile(playerId);
 }
 
 async function getPlayerForm(playerId) {
@@ -70,6 +75,7 @@ async function getTrendStats(playerId) {
 
 module.exports = {
     getPlayerProfile,
+    getLiveProfile,
     getPlayerForm,
     getSurfaceStats,
     getTrendStats

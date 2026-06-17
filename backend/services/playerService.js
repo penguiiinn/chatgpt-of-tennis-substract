@@ -80,6 +80,48 @@ const getPlayerProfile = async (nameOrSlug) => {
   const profile = await scrapePlayerProfile(nameOrSlug);
   if (!profile) return null;
 
+  // Merge missing fields from Multi-Source Scraper if CGI bio fetching failed
+  const needsFallback = (
+    profile.overview.currentRank === "Unknown" || 
+    profile.overview.nationality === "N/A" || 
+    !profile.overview.age || 
+    profile.overview.age === "N/A"
+  );
+
+  if (needsFallback) {
+    console.log(`[playerService] Primary biography scrape has missing critical fields for "${nameOrSlug}". Merging fields from Multi-Source Scraper...`);
+    try {
+      const { getLivePlayerProfile } = require("../scraper/multiSourceScraper");
+      const liveData = await getLivePlayerProfile(nameOrSlug);
+      if (liveData && liveData.player) {
+        const lp = liveData.player;
+        if (profile.overview.currentRank === "Unknown" && lp.rank !== "Unknown") {
+          profile.overview.currentRank = lp.rank;
+        }
+        if (profile.overview.peakRank === "Unknown" && lp.peakRank !== "Unknown") {
+          profile.overview.peakRank = lp.peakRank;
+        }
+        if ((!profile.overview.age || profile.overview.age === "N/A" || profile.overview.age === "Unknown") && lp.age !== "Unknown") {
+          profile.overview.age = lp.age;
+        }
+        if ((profile.overview.nationality === "N/A" || profile.overview.nationality === "Unknown") && lp.country !== "Unknown") {
+          profile.overview.nationality = lp.country;
+        }
+        if ((!profile.overview.handedness || profile.overview.handedness.includes("Unknown")) && lp.handedness !== "Unknown") {
+          profile.overview.handedness = lp.handedness;
+        }
+        if (profile.overview.elo === "Unknown" && lp.elo !== "Unknown") {
+          profile.overview.elo = lp.elo;
+        }
+        if ((profile.overview.ytdWinLoss === "0-0" || profile.overview.ytdWinLoss === "Unknown") && lp.ytdRecord !== "Unknown") {
+          profile.overview.ytdWinLoss = lp.ytdRecord;
+        }
+      }
+    } catch (e) {
+      console.warn(`[playerService] Failed to merge fields from Multi-Source Scraper:`, e.message);
+    }
+  }
+
   // 4. Pre-populate predictions against the 4 static players for frontend compatibility
   profile.predictions = {};
   const staticOpponents = ["Carlos Alcaraz", "Jannik Sinner", "Iga Swiatek", "Anna Blinkova"];

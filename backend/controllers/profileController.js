@@ -10,6 +10,19 @@ async function getPlayerProfile(req, res) {
     }
 }
 
+async function getLivePlayerProfile(req, res) {
+    try {
+        const { playerId } = req.params;
+        const data = await profileService.getLiveProfile(playerId);
+        if (!data) {
+            return res.status(404).json({ error: "Live player profile not found." });
+        }
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+}
+
 async function getPlayerForm(req, res) {
     try {
         const { playerId } = req.params;
@@ -42,6 +55,7 @@ async function getTrendStats(req, res) {
 
 module.exports = {
     getPlayerProfile,
+    getLivePlayerProfile,
     getPlayerForm,
     getSurfaceStats,
     getTrendStats
