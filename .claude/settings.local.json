@@ -18,7 +18,23 @@
       "Bash(node -e \"const { getTrendingPlayers } = require\\(''./backend/services/trendingEngine''\\); const { initStore } = require\\(''./backend/history/historicalStore''\\); \\(async \\(\\) => { await initStore\\(\\); const trending = await getTrendingPlayers\\(''hard'', 5\\); console.log\\(''Top trending:'', trending.map\\(p => p.name + '' '' + p.label + '' \\('' + p.trendScore + ''\\)''\\).join\\(''\\\\n''\\)\\); }\\)\\(\\).catch\\(console.error\\);\")",
       "Bash(ls -la *.json vercel.json)",
       "Bash(git add package.json vercel.json)",
-      "Bash(git commit -m \"fix: add Vercel deployment config files:*)"
+      "Bash(git commit -m \"fix: add Vercel deployment config files:*)",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/players\")",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/search?q=djokovic&name=djokovic&limit=5\")",
+      "Bash(git add backend/scraper/searchScraper.js)",
+      "Bash(git commit -m \"fix: add static players fallback when Tennis Abstract scraping fails:*)",
+      "Bash(git push)",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/search/status\")",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/search?name=novak&limit=5\")",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/search?name=djok&limit=10\")",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/search?name=Novak&limit=20\")",
+      "Bash(git commit -m \"fix: supplement cache with static players:*)",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/search?name=Novak&limit=10\")",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/search?name=djok&limit=5\")",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/search?q=djokovic&name=djokovic&limit=10\")",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/search?name=alcaraz&limit=5\")",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/h2h?p1=Novak%20Djokovic&p2=Carlos%20Alcaraz\")",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/search?name=sinner&limit=5\")"
     ]
   }
 }
