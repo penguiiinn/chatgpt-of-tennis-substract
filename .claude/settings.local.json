@@ -34,7 +34,22 @@
       "Bash(curl -s \"https://aceintel-backend.onrender.com/api/search?q=djokovic&name=djokovic&limit=10\")",
       "Bash(curl -s \"https://aceintel-backend.onrender.com/api/search?name=alcaraz&limit=5\")",
       "Bash(curl -s \"https://aceintel-backend.onrender.com/api/h2h?p1=Novak%20Djokovic&p2=Carlos%20Alcaraz\")",
-      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/search?name=sinner&limit=5\")"
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/search?name=sinner&limit=5\")",
+      "Bash(git add package.json)",
+      "Bash(git commit -m \"fix vercel build script:*)",
+      "Bash(npm run build)",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/health\")",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/predictions?player=Novak%20Djokovic\")",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/prediction?player=Novak%20Djokovic\")",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/trending\")",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/matchup?p1=Jannik%20Sinner&p2=Carlos%20Alcaraz\")",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/matchup/Novak%20Djokovic/Carlos%20Alcaraz\")",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/prediction/match?player=Novak%20Djokovic\")",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/prediction/match?playerA=Novak%20Djokovic&playerB=Carlos%20Alcaraz\")",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/predictions/Novak%20Djokovic/Carlos%20Alcaraz\")",
+      "Bash(curl -s \"https://aceintel-backend.onrender.com/api/predictions/Novak%20Djokovic/Carlos%20Alcaraz\")",
+      "Bash(git add aceintel/Trending.html aceintel/h2h.js)",
+      "Bash(git commit -m \"fix: use production API_BASE in h2h.js and Trending.html:*)"
     ]
   }
 }
