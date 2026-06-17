@@ -20,6 +20,7 @@ const bettingRoutes = require("./routes/bettingRoutes");
 // Step 8 — Tournament Mode
 const tournamentRoutes = require("./routes/tournamentRoutes");
 const historyRoutes = require("./routes/historyRoutes");
+const trendingRoutes = require("./routes/trendingRoutes");
 const { initStore } = require("./history/historicalStore");
 
 const app = express();
@@ -52,6 +53,7 @@ app.use("/api/betting", bettingRoutes);
 // Step 8 — Tournament Mode
 app.use("/api/tournament", tournamentRoutes);
 app.use("/api/history", historyRoutes);
+app.use("/api/trending", trendingRoutes);
 
 
 // Error Handling Middleware
